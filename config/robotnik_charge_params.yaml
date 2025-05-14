@@ -1,0 +1,12 @@
+---
+robotnik_charge:
+  ros__parameters:
+    rate: 10
+    dock_action: "/smooth_drive/dock"
+    move_action: "/move"
+    has_safety_lasers: false
+    max_velocity_x: 1.0
+    max_velocity_y: 1.0 
+    max_velocity_yaw: 1.0
+
+  

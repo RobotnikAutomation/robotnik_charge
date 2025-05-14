@@ -17,11 +17,6 @@ RobotnikCharge::RobotnikCharge()
     std::make_shared<ParamListener>(get_node_parameters_interface());
   params_ = param_listener_->get_params();
 
-  // Params
-  maximum_velocity.linear.x = 1.0;
-  maximum_velocity.linear.y = 1.0;
-  maximum_velocity.angular.z = 1.0;
-
   //TF
   tf_buffer_ =
       std::make_unique<tf2_ros::Buffer>(this->get_clock());
@@ -49,7 +44,7 @@ RobotnikCharge::RobotnikCharge()
   // }
 
   //Dock Action Client
-  dock_action_client_ = rclcpp_action::create_client<Dock>(this, "/smooth_drive/dock");
+  dock_action_client_ = rclcpp_action::create_client<Dock>(this, params_.dock_action);
 
   dock_send_goal_options_ = rclcpp_action::Client<Dock>::SendGoalOptions();
   dock_send_goal_options_.goal_response_callback = std::bind(&RobotnikCharge::dock_goal_callback, this, _1);
@@ -58,14 +53,14 @@ RobotnikCharge::RobotnikCharge()
 
 
   //Move Action Client
-  move_action_client_ = rclcpp_action::create_client<Move>(this, "move");
+  move_action_client_ = rclcpp_action::create_client<Move>(this, params_.move_action);
 
   move_send_goal_options_ = rclcpp_action::Client<Move>::SendGoalOptions();
   move_send_goal_options_.goal_response_callback = std::bind(&RobotnikCharge::move_goal_callback, this, _1);
   move_send_goal_options_.feedback_callback = std::bind(&RobotnikCharge::move_feedback_callback, this, _1, _2);
   move_send_goal_options_.result_callback = std::bind(&RobotnikCharge::move_result_callback, this, _1);
 
-  //Charg Action Server
+  //Charge Action Server
   charge_action_server_ = rclcpp_action::create_server<Charge>(this, "charge",
                                                                 std::bind(&RobotnikCharge::handle_goal, this, _1, _2),
                                                                 std::bind(&RobotnikCharge::handle_cancel, this, _1),
@@ -75,8 +70,7 @@ RobotnikCharge::RobotnikCharge()
   last_battery_msg = this->get_clock()->now();
   is_charging = false;
   remaining_from_docking = Pose();
-  maximum_velocity = Twist();
-  try_number = 1;
+  try_number = 0;
                                                               
   RCLCPP_INFO(get_logger(), "Robotnik Charge started");
   charge_manager_state_ = RobotnikChargeState::Init;
@@ -105,7 +99,6 @@ rclcpp_action::GoalResponse RobotnikCharge::handle_goal(const rclcpp_action::Goa
   RCLCPP_INFO(get_logger(), "Received charging goal to frame %s", goal->dock_frame.c_str());
 
   rclcpp::Time now = this->get_clock()->now();
-  try_number = 1;
 
   rclcpp::Duration last_battery_msg_timeout = now - last_battery_msg;
 
@@ -181,15 +174,17 @@ rclcpp_action::CancelResponse RobotnikCharge::handle_cancel(const std::shared_pt
 
 void RobotnikCharge::handle_accepted(const std::shared_ptr<GoalHandleCharge> goal_handle)
 {
-  if(charge_manager_state_ = RobotnikChargeState::Ready)
+  if(charge_manager_state_ == RobotnikChargeState::Ready)
+  {
     std::thread{std::bind(&RobotnikCharge::execute_charging, this, goal_handle)}.detach();
+  }
 }
 
 void RobotnikCharge::execute_charging(const std::shared_ptr<GoalHandleCharge> goal_handle)
 {
 
   RCLCPP_INFO(this->get_logger(), "GOAL ACCEPTED");
-  rclcpp::Rate loop_rate(1);
+  rclcpp::Rate loop_rate(params_.rate);
   //Check params if has safety lasers or not
   charge_manager_state_ = RobotnikChargeState::ReadyForDocking;
 
@@ -391,6 +386,10 @@ void RobotnikCharge::send_dock_goal(const std::shared_ptr<GoalHandleCharge> goal
   dock_goal.dock_frame = current_goal_.dock_frame;
   dock_goal.robot_dock_frame = current_goal_.robot_dock_frame;
 
+  dock_goal.maximum_velocity.linear.x = params_.max_velocity_x;
+  dock_goal.maximum_velocity.linear.y = params_.max_velocity_y;
+  dock_goal.maximum_velocity.angular.z = params_.max_velocity_yaw;
+
   Pose offset;
 
   offset.x = -current_goal_.dock_offset;
@@ -444,7 +443,7 @@ void RobotnikCharge::activate_relay(const std::shared_ptr<GoalHandleCharge> goal
 
 std::string RobotnikCharge::state_to_text(RobotnikChargeState state)
 {
-  switch (charge_manager_state_)
+  switch (state)
     {
     case RobotnikChargeState::Init:      
       return "DeactivatingLasers";

@@ -70,6 +70,7 @@ private:
   void send_feedback(const std::shared_ptr<GoalHandleCharge> goal_handle);
   void send_result(const std::shared_ptr<GoalHandleCharge> goal_handle);
 
+  //
   void send_dock_goal(const std::shared_ptr<GoalHandleCharge> goal_handle);
   void send_move_goal(const std::shared_ptr<GoalHandleCharge> goal_handle);
   void activate_relay(const std::shared_ptr<GoalHandleCharge> goal_handle);
@@ -109,7 +110,6 @@ private:
   Pose remaining_from_docking;
   int try_number;
   std::string status;
-  Twist maximum_velocity;
 
   std::shared_ptr<GoalHandleCharge> current_charge_goal_;
   Charge::Goal current_goal_;
