@@ -1,0 +1,7 @@
+robotnik_charge:
+  scientific_notation_num:
+    type: double
+    default_value: 0.00000000001
+    description: "Test scientific notation"
+    additional_constraints: "Any string can be here. For example, you might want to embed JSON schema"
+  
