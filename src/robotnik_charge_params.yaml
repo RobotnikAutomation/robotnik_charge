@@ -8,6 +8,14 @@ robotnik_charge:
     validation:
       gt<>: 0
 
+  charge_timeout:
+    type: int
+    default_value: 60
+    read_only: true
+    description: "Seconds of timeout that the charging method must last. default: 60"
+    validation:
+      gt<>: 0
+
   dock_action:
     type: string
     default_value: "/smooth_drive/dock"

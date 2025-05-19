@@ -34,7 +34,9 @@ enum RobotnikChargeState
   AfterMoving = 8,
   ActivateRelay = 9,
   Charging = 10,
-  Cancelled = 11
+  Cancelled = 11,
+  Aborted = 12,
+  Retry = 13
 };
 class RobotnikCharge : public rclcpp::Node
 {
@@ -57,6 +59,7 @@ private:
   rclcpp_action::CancelResponse handle_cancel(const std::shared_ptr<GoalHandleCharge> goal_handle);
   void handle_accepted(const std::shared_ptr<GoalHandleCharge> goal_handle);
 
+  // Callback
   void dock_goal_callback(const GoalHandleDock::SharedPtr & goal_handle);
   void dock_feedback_callback(const GoalHandleDock::SharedPtr & goal_handle, const std::shared_ptr<const Dock::Feedback> feedback);
   void dock_result_callback(const GoalHandleDock::WrappedResult & result);
@@ -67,13 +70,16 @@ private:
 
   void battery_status_callback(const BatteryStatusStamped::SharedPtr msg);
 
-  void send_feedback(const std::shared_ptr<GoalHandleCharge> goal_handle);
-  void send_result(const std::shared_ptr<GoalHandleCharge> goal_handle);
+  // Atomic Actions
+  void send_feedback();
+  void send_result();
 
-  //
-  void send_dock_goal(const std::shared_ptr<GoalHandleCharge> goal_handle);
-  void send_move_goal(const std::shared_ptr<GoalHandleCharge> goal_handle);
-  void activate_relay(const std::shared_ptr<GoalHandleCharge> goal_handle);
+  void send_dock_goal();
+  void send_move_goal();
+  void activate_relay();
+  void change_laser_mode();
+  void retry();
+  void abort();
 
   void execute_charging(const std::shared_ptr<GoalHandleCharge> goal_handle);
   std::string state_to_text(RobotnikChargeState state);
@@ -98,22 +104,22 @@ private:
   rclcpp_action::Server<Charge>::SharedPtr charge_action_server_;
 
   //Variables
+  int try_number_;
+  rclcpp::Time init_charging_time_;
+  bool is_charging_;
+  Pose remaining_;
+
   geometry_msgs::msg::TransformStamped dock_frame_transform_;
 
   RobotnikChargeState charge_manager_state_;
-  bool is_charging;
-  rclcpp::Time last_battery_msg;
+  rclcpp::Time last_battery_msg_;
 
   std::shared_ptr<tf2_ros::TransformListener> tf_listener_{nullptr};
   std::unique_ptr<tf2_ros::Buffer> tf_buffer_;
 
-  Pose remaining_from_docking;
-  int try_number;
-  std::string status;
 
-  std::shared_ptr<GoalHandleCharge> current_charge_goal_;
+  std::shared_ptr<GoalHandleCharge> current_charge_handle_;
   Charge::Goal current_goal_;
-  int max_retries_;
 
 };
 

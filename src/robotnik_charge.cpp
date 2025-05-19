@@ -17,15 +17,15 @@ RobotnikCharge::RobotnikCharge()
     std::make_shared<ParamListener>(get_node_parameters_interface());
   params_ = param_listener_->get_params();
 
-  //TF
+  // TF
   tf_buffer_ =
       std::make_unique<tf2_ros::Buffer>(this->get_clock());
   tf_listener_ =
       std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);
 
   dock_frame_transform_ = geometry_msgs::msg::TransformStamped();
-      
-  //Battery Subscriber
+
+  // Battery Subscriber
   battery_status_subscription_ = create_subscription<BatteryStatusStamped>(
     "battery_status_stamped/data", 10,
     std::bind(&RobotnikCharge::battery_status_callback, this, _1));
@@ -37,10 +37,10 @@ RobotnikCharge::RobotnikCharge()
   // {
   //   if (!rclcpp::ok())
   //   {
-  //     RCLCPP_ERROR(this->get_logger(), "Interrupted while waiting for the service. Exiting.");
+  //     RCLCPP_ERROR(this->get_logger(), "Interrupted while waiting for the service charge_manager/set_charger_relay. Exiting.");
   //     return;
   //   }
-  //   RCLCPP_INFO(this->get_logger(), "service not available, waiting again...");
+  //   RCLCPP_INFO(this->get_logger(), "charge_manager/set_charger_relay not available, waiting again...");
   // }
 
   //Dock Action Client
@@ -67,11 +67,10 @@ RobotnikCharge::RobotnikCharge()
                                                                 std::bind(&RobotnikCharge::handle_accepted, this, _1));
 
 
-  last_battery_msg = this->get_clock()->now();
-  is_charging = false;
-  remaining_from_docking = Pose();
-  try_number = 0;
-                                                              
+  last_battery_msg_ = this->get_clock()->now();
+  is_charging_ = false;
+  remaining_ = Pose();
+  try_number_ = 0;
   RCLCPP_INFO(get_logger(), "Robotnik Charge started");
   charge_manager_state_ = RobotnikChargeState::Init;
 
@@ -89,6 +88,23 @@ void RobotnikCharge::params_timer_callback() {
 rclcpp_action::GoalResponse RobotnikCharge::handle_goal(const rclcpp_action::GoalUUID &uuid,
                                                         std::shared_ptr<const Charge::Goal> goal)
 {
+
+  // Check if robot is already charging
+  if ((this->get_clock()->now() - last_battery_msg_).seconds() > 1.0)
+  {
+    rclcpp_action::GoalResponse response = rclcpp_action::GoalResponse::REJECT;
+    RCLCPP_ERROR(this->get_logger(), "Battery msg not updated in the last 1 second");
+    return response;
+  }
+
+  if (is_charging_)
+  {
+    RCLCPP_WARN(this->get_logger(), "Robot is already charging");
+    rclcpp_action::GoalResponse response = rclcpp_action::GoalResponse::REJECT;
+    return response;
+  }
+
+  // Check if frames are empty and exists
   if (goal->dock_frame.empty())
   {
     rclcpp_action::GoalResponse response = rclcpp_action::GoalResponse::REJECT;
@@ -96,39 +112,10 @@ rclcpp_action::GoalResponse RobotnikCharge::handle_goal(const rclcpp_action::Goa
     return response;
   }
 
-  RCLCPP_INFO(get_logger(), "Received charging goal to frame %s", goal->dock_frame.c_str());
-
-  rclcpp::Time now = this->get_clock()->now();
-
-  rclcpp::Duration last_battery_msg_timeout = now - last_battery_msg;
-
-  if (last_battery_msg_timeout > rclcpp::Duration(1, 0))
+  if (goal->robot_dock_frame.empty())
   {
     rclcpp_action::GoalResponse response = rclcpp_action::GoalResponse::REJECT;
-    RCLCPP_ERROR(this->get_logger(), "Battery msg not updated in the last 1 second");
-    return response;
-  }
-
-  if (!dock_action_client_->wait_for_action_server(std::chrono::seconds(10)))
-  {
-    RCLCPP_ERROR(this->get_logger(), "Dock server not available after waiting");
-    rclcpp_action::GoalResponse response = rclcpp_action::GoalResponse::REJECT;
-    return response;
-  }
-
-  if (!move_action_client_->wait_for_action_server(std::chrono::seconds(10)))
-  {
-    RCLCPP_ERROR(this->get_logger(), "Move server not available after waiting");
-    rclcpp_action::GoalResponse response = rclcpp_action::GoalResponse::REJECT;
-    return response;
-  }
-
-  // TODO: Safety service
-
-  if (is_charging)
-  {
-    RCLCPP_WARN(this->get_logger(), "Robot is already charging");
-    rclcpp_action::GoalResponse response = rclcpp_action::GoalResponse::REJECT;
+    RCLCPP_ERROR(this->get_logger(), "robot_dock_frame is empty");
     return response;
   }
 
@@ -147,6 +134,28 @@ rclcpp_action::GoalResponse RobotnikCharge::handle_goal(const rclcpp_action::Goa
     return response;
   }
 
+  RCLCPP_INFO(get_logger(), "Received charging goal to frame %s from %s", goal->dock_frame.c_str(), goal->robot_dock_frame.c_str());
+
+  // Check Actions status
+  if (!dock_action_client_->wait_for_action_server(std::chrono::seconds(10)))
+  {
+    RCLCPP_ERROR(this->get_logger(), "Dock server not available after waiting");
+    rclcpp_action::GoalResponse response = rclcpp_action::GoalResponse::REJECT;
+    return response;
+  }
+
+  if (!move_action_client_->wait_for_action_server(std::chrono::seconds(10)))
+  {
+    RCLCPP_ERROR(this->get_logger(), "Move server not available after waiting");
+    rclcpp_action::GoalResponse response = rclcpp_action::GoalResponse::REJECT;
+    return response;
+  }
+
+  // TODO: Safety service
+  if(params_.has_safety_lasers)
+  {
+    RCLCPP_WARN(this->get_logger(), "Changing Lasers mode");
+  }
 
   rclcpp_action::GoalResponse response = rclcpp_action::GoalResponse::ACCEPT_AND_EXECUTE;
   charge_manager_state_ = RobotnikChargeState::Ready;
@@ -155,20 +164,22 @@ rclcpp_action::GoalResponse RobotnikCharge::handle_goal(const rclcpp_action::Goa
 
 rclcpp_action::CancelResponse RobotnikCharge::handle_cancel(const std::shared_ptr<GoalHandleCharge> goal_handle)
 {
-  charge_manager_state_ = RobotnikChargeState::Cancelled;
 
+  // Cancel actions
   dock_action_client_->async_cancel_all_goals();
   move_action_client_->async_cancel_all_goals();
 
+  //Send result
   auto result = std::make_shared<Charge::Result>();
-
   result->response.message = "Charge cancelled by user";
   result->response.success = false;
 
   goal_handle->abort(result);
 
-  RCLCPP_WARN(this->get_logger(), "Goal Cancelled");
+  // Change State
+  charge_manager_state_ = RobotnikChargeState::Cancelled;
 
+  RCLCPP_WARN(this->get_logger(), "Goal Cancelled");
   return rclcpp_action::CancelResponse::ACCEPT;
 }
 
@@ -183,30 +194,39 @@ void RobotnikCharge::handle_accepted(const std::shared_ptr<GoalHandleCharge> goa
 void RobotnikCharge::execute_charging(const std::shared_ptr<GoalHandleCharge> goal_handle)
 {
 
+  // Goal Accepted
   RCLCPP_INFO(this->get_logger(), "GOAL ACCEPTED");
   rclcpp::Rate loop_rate(params_.rate);
-  //Check params if has safety lasers or not
-  charge_manager_state_ = RobotnikChargeState::ReadyForDocking;
 
   // Guardar el goal y preparar
-  current_charge_goal_ = goal_handle;
+  current_charge_handle_ = goal_handle;
   current_goal_ = *goal_handle->get_goal();
-  try_number = 0;
+  try_number_ = 0;
+  init_charging_time_ = this->get_clock()->now();
+  
+  if(params_.has_safety_lasers)
+  {
+    charge_manager_state_ = RobotnikChargeState::DeactivatingLasers;
+  }else
+  {
+    charge_manager_state_ = RobotnikChargeState::ReadyForDocking;
+  }
 
-  while(rclcpp::ok() && try_number <= current_goal_.retries)
+  while(rclcpp::ok() && try_number_ <= current_goal_.retries)
   {
 
     switch (charge_manager_state_)
     {
     case RobotnikChargeState::DeactivatingLasers:      
-      // deactivate_lasers(goal_handle);
+      change_laser_mode();
       break;
     
     case RobotnikChargeState::ReadyForDocking:   
-      send_dock_goal(goal_handle);
+      send_dock_goal();
       break;
 
-    case RobotnikChargeState::Docking:  
+    case RobotnikChargeState::Docking:
+      // handled by dock feedback
       break;
     
     case RobotnikChargeState::AfterDocking:      
@@ -214,7 +234,7 @@ void RobotnikCharge::execute_charging(const std::shared_ptr<GoalHandleCharge> go
       break;
 
     case RobotnikChargeState::ReadyForMoving: 
-      send_move_goal(goal_handle);
+      send_move_goal();
       break;
 
     case RobotnikChargeState::Moving:
@@ -225,22 +245,43 @@ void RobotnikCharge::execute_charging(const std::shared_ptr<GoalHandleCharge> go
       break;
   
     case RobotnikChargeState::ActivateRelay:
-      activate_relay(goal_handle);
+      activate_relay();
       break;
     
     case RobotnikChargeState::Charging:      
-      send_result(goal_handle);
+      send_result();
       break;
 
     case RobotnikChargeState::Cancelled:      
       return;
+      break;
+
+    case RobotnikChargeState::Aborted:   
+      abort();   
+      return;
+      break;
+    
+    case RobotnikChargeState::Retry:     
+      retry(); 
       break;
     
     default:
       break;
     }
 
-    send_feedback(goal_handle);
+    if(init_charging_time_.seconds() > params_.charge_timeout)
+    {
+      RCLCPP_ERROR(this->get_logger(), "Charging timeout, ABORT! (Current action time: %f)", init_charging_time_.seconds());
+      charge_manager_state_ = RobotnikChargeState::Aborted;
+    }
+
+    if(is_charging_)
+    {
+      RCLCPP_INFO(this->get_logger(), "Charging detected while action");
+      charge_manager_state_ = RobotnikChargeState::Charging;
+    }
+
+    send_feedback();
     loop_rate.sleep();
 
   }
@@ -252,13 +293,14 @@ void RobotnikCharge::execute_charging(const std::shared_ptr<GoalHandleCharge> go
 //Battery Subscriber
 void RobotnikCharge::battery_status_callback(const BatteryStatusStamped::SharedPtr msg)
 {
-  last_battery_msg = this->get_clock()->now();
-  is_charging = msg->status.is_charging;
+  last_battery_msg_ = this->get_clock()->now();
+  is_charging_ = msg->status.is_charging;
 
-  if(is_charging)
+  if(is_charging_)
   {
     dock_action_client_->async_cancel_all_goals();
     move_action_client_->async_cancel_all_goals();
+    charge_manager_state_ = RobotnikChargeState::Charging;
   }
 }
 
@@ -268,22 +310,23 @@ void RobotnikCharge::dock_feedback_callback(const GoalHandleDock::SharedPtr &goa
   if (!goal_handle)
   {
     RCLCPP_ERROR(this->get_logger(), "Dock was rejected by server");
+    charge_manager_state_ = RobotnikChargeState::Aborted;
   }
   else
   {
     RCLCPP_INFO(this->get_logger(), "Dock accepted by server, waiting for result");
   }
 
-  remaining_from_docking = feedback->remaining;
+  remaining_ = feedback->remaining;
 }
 
 void RobotnikCharge::dock_goal_callback(const GoalHandleDock::SharedPtr &goal_handle)
 {
 
-  charge_manager_state_ = RobotnikChargeState::Docking;
   if (!goal_handle)
   {
     RCLCPP_ERROR(this->get_logger(), "Dock was rejected by server");
+    charge_manager_state_ = RobotnikChargeState::Aborted;
   }
   else
   {
@@ -305,7 +348,7 @@ void RobotnikCharge::dock_result_callback(const GoalHandleDock::WrappedResult &r
   case rclcpp_action::ResultCode::CANCELED:
   default:
     RCLCPP_ERROR(this->get_logger(), "Docking failed.");
-    current_charge_goal_->abort(std::make_shared<Charge::Result>());
+    charge_manager_state_ = RobotnikChargeState::Aborted;
     break;
   }
 }
@@ -316,25 +359,28 @@ void RobotnikCharge::move_feedback_callback(const GoalHandleMove::SharedPtr &goa
   if (!goal_handle)
   {
     RCLCPP_ERROR(this->get_logger(), "Move was rejected by server");
+    charge_manager_state_ = RobotnikChargeState::Aborted;
   }
   else
   {
     RCLCPP_INFO(this->get_logger(), "Move accepted by server, waiting for result");
+    charge_manager_state_ = RobotnikChargeState::Moving;
   }
 
-  remaining_from_docking = feedback->remaining;
+  remaining_ = feedback->remaining;
 }
 
 void RobotnikCharge::move_goal_callback(const GoalHandleMove::SharedPtr &goal_handle)
 {
-  charge_manager_state_ = RobotnikChargeState::Moving;
   if (!goal_handle)
   {
     RCLCPP_ERROR(this->get_logger(), "Move was rejected by server");
+    charge_manager_state_ = RobotnikChargeState::Aborted;
   }
   else
   {
     RCLCPP_INFO(this->get_logger(), "Move accepted by server, waiting for result");
+    charge_manager_state_ = RobotnikChargeState::Moving;
   }
 }
 
@@ -351,36 +397,37 @@ void RobotnikCharge::move_result_callback(const GoalHandleMove::WrappedResult &r
   case rclcpp_action::ResultCode::CANCELED:
   default:
     RCLCPP_ERROR(this->get_logger(), "Move failed.");
+    charge_manager_state_ = RobotnikChargeState::Aborted;
     break;
   }
 
 }
 
-/******* Actions *******/
-void RobotnikCharge::send_feedback(const std::shared_ptr<GoalHandleCharge> goal_handle)
+/******* Atomic Actions *******/
+void RobotnikCharge::send_feedback()
 {
   auto feedback = std::make_shared<Charge::Feedback>();
   auto result = std::make_shared<Charge::Result>();
 
-  feedback->remaining_distance = remaining_from_docking;
+  feedback->remaining_distance = remaining_;
   feedback->status = state_to_text(charge_manager_state_);
-  feedback->try_number = try_number;
-  goal_handle->publish_feedback(feedback);
+  feedback->try_number = try_number_;
+  current_charge_handle_->publish_feedback(feedback);
 }
 
-void RobotnikCharge::send_result(const std::shared_ptr<GoalHandleCharge> goal_handle)
+void RobotnikCharge::send_result()
 {
   auto result = std::make_shared<Charge::Result>();
 
   result->response.message = "Robot is Charging";
   result->response.success = true;
-  goal_handle->succeed(result);
+  current_charge_handle_->succeed(result);
 }
 
-void RobotnikCharge::send_dock_goal(const std::shared_ptr<GoalHandleCharge> goal_handle)
+void RobotnikCharge::send_dock_goal()
 {
-  charge_manager_state_ = RobotnikChargeState::Docking;
-  RCLCPP_INFO(this->get_logger(), "Sending dock goal (attempt %d)", try_number);
+  // Prepare docking
+  RCLCPP_INFO(this->get_logger(), "Sending dock goal (attempt %d)", try_number_);
 
   Dock::Goal dock_goal;
   dock_goal.dock_frame = current_goal_.dock_frame;
@@ -391,14 +438,15 @@ void RobotnikCharge::send_dock_goal(const std::shared_ptr<GoalHandleCharge> goal
   dock_goal.maximum_velocity.angular.z = params_.max_velocity_yaw;
 
   Pose offset;
-
   offset.x = -current_goal_.dock_offset;
   dock_goal.dock_offset = offset;
 
   dock_action_client_->async_send_goal(dock_goal, dock_send_goal_options_);
+  
+  charge_manager_state_ = RobotnikChargeState::Docking;
 }
 
-void RobotnikCharge::send_move_goal(const std::shared_ptr<GoalHandleCharge> goal_handle)
+void RobotnikCharge::send_move_goal()
 {
   charge_manager_state_ = RobotnikChargeState::Moving;
   RCLCPP_INFO(this->get_logger(), "Sending move goal");
@@ -406,14 +454,14 @@ void RobotnikCharge::send_move_goal(const std::shared_ptr<GoalHandleCharge> goal
   try
   {
     dock_frame_transform_ = tf_buffer_->lookupTransform(
-        goal_handle->get_goal().get()->dock_frame, goal_handle->get_goal().get()->robot_dock_frame,
+      current_charge_handle_->get_goal().get()->dock_frame, current_charge_handle_->get_goal().get()->robot_dock_frame,
         tf2::TimePointZero);
   }
   catch (const tf2::TransformException &ex)
   {
     RCLCPP_ERROR(
         this->get_logger(), "Could not transform %s to %s: %s",
-        goal_handle->get_goal().get()->dock_frame.c_str(), goal_handle->get_goal().get()->robot_dock_frame.c_str(), ex.what());
+        current_charge_handle_->get_goal().get()->dock_frame.c_str(), current_charge_handle_->get_goal().get()->robot_dock_frame.c_str(), ex.what());
   }
 
   Move::Goal move_goal;
@@ -425,7 +473,7 @@ void RobotnikCharge::send_move_goal(const std::shared_ptr<GoalHandleCharge> goal
   
 }
 
-void RobotnikCharge::activate_relay(const std::shared_ptr<GoalHandleCharge> goal_handle)
+void RobotnikCharge::activate_relay()
 {
   auto request = std::make_shared<SetBool::Request>();
 
@@ -433,11 +481,52 @@ void RobotnikCharge::activate_relay(const std::shared_ptr<GoalHandleCharge> goal
 
   auto result = set_charger_relay_->async_send_request(request);
 
-  if(not is_charging)
+  if(not is_charging_)
   {
-    charge_manager_state_ = RobotnikChargeState::ReadyForDocking;
-    try_number++;
+    charge_manager_state_ = RobotnikChargeState::Retry;
   }
+
+}
+
+void RobotnikCharge::retry()
+{
+  init_charging_time_ = this->get_clock()->now();
+  try_number_++;
+
+  Move::Goal move_goal;
+  Pose target;
+  target.x = -1.0;
+  move_goal.goal = target;
+
+  move_action_client_->async_send_goal(move_goal, move_send_goal_options_);
+
+  charge_manager_state_ = RobotnikChargeState::ReadyForDocking;
+
+}
+
+void RobotnikCharge::abort()
+{
+  
+  // Cancel actions
+  dock_action_client_->async_cancel_all_goals();
+  move_action_client_->async_cancel_all_goals();
+
+  //Send result
+  auto result = std::make_shared<Charge::Result>();
+  result->response.message = "Charge aborted, there are some failures during the procedure";
+  result->response.success = false;
+
+  current_charge_handle_->abort(result);
+
+
+}
+
+void RobotnikCharge::change_laser_mode()
+{
+  //Change Mode
+  /*TO DO*/
+
+  charge_manager_state_ = RobotnikChargeState::ReadyForDocking;
 
 }
 
