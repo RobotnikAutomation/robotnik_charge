@@ -34,6 +34,14 @@ robotnik_charge:
     validation:
       gt_eq<>: 0
 
+  timeout_charging_detection:
+    type: int
+    default_value: 1
+    read_only: true
+    description: "Seconds to wait to detect charge. default: 1"
+    validation:
+      gt_eq<>: 0
+
   has_safety_lasers:
     type: bool
     default_value: false

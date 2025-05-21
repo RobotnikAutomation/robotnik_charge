@@ -27,17 +27,19 @@ enum RobotnikChargeState
   Init = 0,
   Ready = 1,
   DeactivatingLasers = 2,
-  ReadyForDocking = 3,
+  InitDocking = 3,
   Docking = 4,
-  AfterDocking = 5,
-  ReadyForMoving = 6,
+  EndDocking = 5,
+  InitMoving = 6,
   Moving = 7,
-  AfterMoving = 8,
+  EndMoving = 8,
   ActivateRelay = 9,
-  Charging = 10,
-  Cancelled = 11,
-  Aborted = 12,
-  Retry = 13
+  WaitCharging = 10,
+  Charging = 11,
+  Cancelled = 12,
+  Aborted = 13,
+  Retry = 14,
+  MovingBackwards = 15
 };
 class RobotnikCharge : public rclcpp::Node
 {
@@ -74,7 +76,7 @@ private:
   // Atomic Actions
   void send_feedback();
   void send_result();
-
+  void wait_charging();
   void send_dock_goal();
   void send_move_goal();
   void activate_relay();
@@ -121,6 +123,9 @@ private:
 
   std::shared_ptr<GoalHandleCharge> current_charge_handle_;
   Charge::Goal current_goal_;
+
+  bool dock_finished_;
+  bool move_finished_;
 
 };
 
