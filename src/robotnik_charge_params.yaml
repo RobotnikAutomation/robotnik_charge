@@ -9,10 +9,10 @@ robotnik_charge:
       gt<>: 0
 
   charge_timeout:
-    type: int
-    default_value: 60
+    type: double
+    default_value: 60.0
     read_only: true
-    description: "Seconds of timeout that the charging method must last. default: 60"
+    description: "Seconds of timeout that the charging method must last. default: 60.0"
     validation:
       gt<>: 0
 
@@ -25,6 +25,14 @@ robotnik_charge:
     type: string
     default_value: "/move"
     description: "Name of move action. default: /move"
+
+  charge_contact_distance_from_marker:
+    type: double
+    default_value: 0.14
+    read_only: true
+    description: "Distance from marker to charge contact in docking station. default: 0.14"
+    validation:
+      gt_eq<>: 0
 
   has_safety_lasers:
     type: bool

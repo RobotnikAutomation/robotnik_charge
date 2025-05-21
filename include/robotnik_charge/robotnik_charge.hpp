@@ -6,13 +6,14 @@
 
 #include "rclcpp/rclcpp.hpp"
 #include "rclcpp_action/rclcpp_action.hpp"
-#include "robotnik_battery_msgs/msg/battery_status_stamped.hpp"
+#include "robotnik_battery_msgs/msg/battery_status.hpp"
 #include "robotnik_navigation_msgs/action/charge.hpp"
 #include "robotnik_navigation_msgs/action/dock.hpp"
 #include "robotnik_navigation_msgs/action/move.hpp"
 #include "geometry_msgs/msg/pose2_d.hpp"
 #include "geometry_msgs/msg/twist.hpp"
-#include <std_srvs/srv/set_bool.hpp>
+#include "std_srvs/srv/set_bool.hpp"
+
 #include "rclcpp_action/rclcpp_action.hpp"
 #include "robotnik_charge/robotnik_charge_parameters.hpp"
 #include "tf2/exceptions.h"
@@ -41,7 +42,7 @@ enum RobotnikChargeState
 class RobotnikCharge : public rclcpp::Node
 {
 public:
-  using BatteryStatusStamped = robotnik_battery_msgs::msg::BatteryStatusStamped;
+  using BatteryStatus = robotnik_battery_msgs::msg::BatteryStatus;
   using Charge = robotnik_navigation_msgs::action::Charge;
   using Dock = robotnik_navigation_msgs::action::Dock;
   using Move = robotnik_navigation_msgs::action::Move;
@@ -68,7 +69,7 @@ private:
   void move_feedback_callback(const GoalHandleMove::SharedPtr & goal_handle, const std::shared_ptr<const Move::Feedback> feedback);
   void move_result_callback(const GoalHandleMove::WrappedResult & result);
 
-  void battery_status_callback(const BatteryStatusStamped::SharedPtr msg);
+  void battery_status_callback(const BatteryStatus::SharedPtr msg);
 
   // Atomic Actions
   void send_feedback();
@@ -91,7 +92,7 @@ private:
   void params_timer_callback();
 
   // Interfaces
-  rclcpp::Subscription<BatteryStatusStamped>::SharedPtr battery_status_subscription_;
+  rclcpp::Subscription<BatteryStatus>::SharedPtr battery_status_subscription_;
 
   rclcpp::Client<SetBool>::SharedPtr set_charger_relay_;
 

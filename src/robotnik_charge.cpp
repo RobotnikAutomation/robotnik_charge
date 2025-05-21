@@ -26,22 +26,22 @@ RobotnikCharge::RobotnikCharge()
   dock_frame_transform_ = geometry_msgs::msg::TransformStamped();
 
   // Battery Subscriber
-  battery_status_subscription_ = create_subscription<BatteryStatusStamped>(
-    "battery_status_stamped/data", 10,
+  battery_status_subscription_ = create_subscription<BatteryStatus>(
+    "battery_estimator/data", 10,
     std::bind(&RobotnikCharge::battery_status_callback, this, _1));
 
   // Service client to set relay
   set_charger_relay_ = this->create_client<SetBool>("charge_manager/set_charger_relay");
 
-  // while (!set_charger_relay_->wait_for_service(1s))
-  // {
-  //   if (!rclcpp::ok())
-  //   {
-  //     RCLCPP_ERROR(this->get_logger(), "Interrupted while waiting for the service charge_manager/set_charger_relay. Exiting.");
-  //     return;
-  //   }
-  //   RCLCPP_INFO(this->get_logger(), "charge_manager/set_charger_relay not available, waiting again...");
-  // }
+  while (!set_charger_relay_->wait_for_service(1s))
+  {
+    if (!rclcpp::ok())
+    {
+      RCLCPP_ERROR(this->get_logger(), "Interrupted while waiting for the service charge_manager/set_charger_relay. Exiting.");
+      return;
+    }
+    RCLCPP_INFO(this->get_logger(), "charge_manager/set_charger_relay not available, waiting again...");
+  }
 
   //Dock Action Client
   dock_action_client_ = rclcpp_action::create_client<Dock>(this, params_.dock_action);
@@ -90,10 +90,10 @@ rclcpp_action::GoalResponse RobotnikCharge::handle_goal(const rclcpp_action::Goa
 {
 
   // Check if robot is already charging
-  if ((this->get_clock()->now() - last_battery_msg_).seconds() > 1.0)
+  if ((this->get_clock()->now() - last_battery_msg_).seconds() > 5.0)
   {
     rclcpp_action::GoalResponse response = rclcpp_action::GoalResponse::REJECT;
-    RCLCPP_ERROR(this->get_logger(), "Battery msg not updated in the last 1 second");
+    RCLCPP_ERROR(this->get_logger(), "Battery msg not updated in the last 5 second");
     return response;
   }
 
@@ -168,13 +168,6 @@ rclcpp_action::CancelResponse RobotnikCharge::handle_cancel(const std::shared_pt
   // Cancel actions
   dock_action_client_->async_cancel_all_goals();
   move_action_client_->async_cancel_all_goals();
-
-  //Send result
-  auto result = std::make_shared<Charge::Result>();
-  result->response.message = "Charge cancelled by user";
-  result->response.success = false;
-
-  goal_handle->abort(result);
 
   // Change State
   charge_manager_state_ = RobotnikChargeState::Cancelled;
@@ -269,7 +262,7 @@ void RobotnikCharge::execute_charging(const std::shared_ptr<GoalHandleCharge> go
       break;
     }
 
-    if(init_charging_time_.seconds() > params_.charge_timeout)
+    if((this->get_clock()->now()-init_charging_time_).seconds() > params_.charge_timeout)
     {
       RCLCPP_ERROR(this->get_logger(), "Charging timeout, ABORT! (Current action time: %f)", init_charging_time_.seconds());
       charge_manager_state_ = RobotnikChargeState::Aborted;
@@ -291,10 +284,10 @@ void RobotnikCharge::execute_charging(const std::shared_ptr<GoalHandleCharge> go
 /******* Callbacks ********/
 
 //Battery Subscriber
-void RobotnikCharge::battery_status_callback(const BatteryStatusStamped::SharedPtr msg)
+void RobotnikCharge::battery_status_callback(const BatteryStatus::SharedPtr msg)
 {
   last_battery_msg_ = this->get_clock()->now();
-  is_charging_ = msg->status.is_charging;
+  is_charging_ = msg->is_charging;
 
   if(is_charging_)
   {
@@ -438,7 +431,7 @@ void RobotnikCharge::send_dock_goal()
   dock_goal.maximum_velocity.angular.z = params_.max_velocity_yaw;
 
   Pose offset;
-  offset.x = -current_goal_.dock_offset;
+  offset.x = -params_.charge_contact_distance_from_marker-current_goal_.dock_offset;
   dock_goal.dock_offset = offset;
 
   dock_action_client_->async_send_goal(dock_goal, dock_send_goal_options_);
@@ -451,22 +444,24 @@ void RobotnikCharge::send_move_goal()
   charge_manager_state_ = RobotnikChargeState::Moving;
   RCLCPP_INFO(this->get_logger(), "Sending move goal");
 
+  Move::Goal move_goal;
+  Pose target;
+
   try
   {
     dock_frame_transform_ = tf_buffer_->lookupTransform(
-      current_charge_handle_->get_goal().get()->dock_frame, current_charge_handle_->get_goal().get()->robot_dock_frame,
+      current_charge_handle_->get_goal().get()->robot_dock_frame, current_charge_handle_->get_goal().get()->dock_frame,
         tf2::TimePointZero);
+    target.x = dock_frame_transform_.transform.translation.x - params_.charge_contact_distance_from_marker;
   }
   catch (const tf2::TransformException &ex)
   {
     RCLCPP_ERROR(
         this->get_logger(), "Could not transform %s to %s: %s",
         current_charge_handle_->get_goal().get()->dock_frame.c_str(), current_charge_handle_->get_goal().get()->robot_dock_frame.c_str(), ex.what());
+    target.x = current_goal_.dock_offset;
   }
 
-  Move::Goal move_goal;
-  Pose target;
-  target.x = dock_frame_transform_.transform.translation.x;
   move_goal.goal = target;
 
   move_action_client_->async_send_goal(move_goal, move_send_goal_options_);
@@ -475,15 +470,35 @@ void RobotnikCharge::send_move_goal()
 
 void RobotnikCharge::activate_relay()
 {
+  RCLCPP_INFO(this->get_logger(), "Activating charge relay");
+  
   auto request = std::make_shared<SetBool::Request>();
 
+  RCLCPP_INFO(this->get_logger(), "prepare request");
   request->data = true;
 
-  auto result = set_charger_relay_->async_send_request(request);
+  while (!set_charger_relay_->wait_for_service(1s))
+  {
+    if (!rclcpp::ok())
+    {
+      RCLCPP_ERROR(this->get_logger(), "Interrupted while waiting for the service charge_manager/set_charger_relay. Exiting.");
+      charge_manager_state_ = RobotnikChargeState::Aborted;
+      return;
+    }
+    RCLCPP_INFO(this->get_logger(), "charge_manager/set_charger_relay not available, waiting again...");
+  }
+
+  RCLCPP_INFO(this->get_logger(), "send request");
+  set_charger_relay_->async_send_request(request);
+
+  RCLCPP_INFO(this->get_logger(), "is charging?");
 
   if(not is_charging_)
   {
     charge_manager_state_ = RobotnikChargeState::Retry;
+  }else
+  {
+    charge_manager_state_ = RobotnikChargeState::Charging;
   }
 
 }
