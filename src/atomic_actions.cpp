@@ -8,7 +8,7 @@ namespace robotnik_charge
 {
 
 /******* Atomic Actions *******/
-void RobotnikCharge::change_laser_mode()
+void RobotnikCharge::change_laser_mode(bool activate)
 {
   RCLCPP_INFO(this->get_logger(), "Changing Laser mode");
 
@@ -69,13 +69,20 @@ void RobotnikCharge::send_move_goal()
   
 }
 
-void RobotnikCharge::activate_relay()
+void RobotnikCharge::change_relay_mode(bool activate)
 {
-  RCLCPP_INFO(this->get_logger(), "Activating charge relay");
+  if(activate)
+  {
+    RCLCPP_INFO(this->get_logger(), "Charge relay mode to true");
+  }else
+  {
+      
+    RCLCPP_INFO(this->get_logger(), "Charge relay mode to false"); 
+  }
   
   auto request = std::make_shared<SetBool::Request>();
 
-  request->data = true;
+  request->data = activate;
 
   while (!set_charger_relay_->wait_for_service(1s))
   {
@@ -111,20 +118,25 @@ void RobotnikCharge::retry()
   RCLCPP_INFO(this->get_logger(), "Retrying. Attempt: %d", try_number_);
   init_charging_time_ = this->get_clock()->now();
 
-  move_finished_ = false;
-  Move::Goal move_goal;
-  Pose target;
-  target.x = -0.5;
-  move_goal.goal = target;
-
-  move_action_client_->async_send_goal(move_goal, move_send_goal_options_);
+  send_move_backwards();
 
 }
 
-void RobotnikCharge::send_feedback()
+void RobotnikCharge::send_move_backwards()
+{
+
+    move_finished_ = false;
+    Move::Goal move_goal;
+    Pose target;
+    target.x = -0.5;
+    move_goal.goal = target;
+
+    move_action_client_->async_send_goal(move_goal, move_send_goal_options_);
+}
+
+void RobotnikCharge::send_charge_feedback()
 {
   auto feedback = std::make_shared<Charge::Feedback>();
-  auto result = std::make_shared<Charge::Result>();
 
   feedback->remaining_distance = remaining_;
   feedback->status = state_to_text(charge_manager_state_);
@@ -132,7 +144,16 @@ void RobotnikCharge::send_feedback()
   current_charge_handle_->publish_feedback(feedback);
 }
 
-void RobotnikCharge::send_result(bool success)
+void RobotnikCharge::send_uncharge_feedback()
+{
+  auto feedback = std::make_shared<Uncharge::Feedback>();
+
+  feedback->remaining_distance = remaining_;
+  feedback->status = state_to_text(charge_manager_state_);
+  current_uncharge_handle_->publish_feedback(feedback);
+}
+
+void RobotnikCharge::send_charge_result(bool success)
 {
   auto result = std::make_shared<Charge::Result>();
 
@@ -149,7 +170,24 @@ void RobotnikCharge::send_result(bool success)
   }
 }
 
-void RobotnikCharge::abort()
+void RobotnikCharge::send_uncharge_result(bool success)
+{
+  auto result = std::make_shared<Uncharge::Result>();
+
+  if(success)
+  {
+    result->response.message = "Robot is Uncharged";
+    result->response.success = true;
+    current_uncharge_handle_->succeed(result);
+  }else
+  {
+    result->response.message = "Robot is Charging or something is wrong";
+    result->response.success = false;
+    current_uncharge_handle_->abort(result);
+  }
+}
+
+void RobotnikCharge::charge_abort()
 {
   RCLCPP_WARN(this->get_logger(), "Aborting");
   
@@ -163,6 +201,23 @@ void RobotnikCharge::abort()
   result->response.success = false;
 
   current_charge_handle_->abort(result);
+
+
+}
+
+void RobotnikCharge::uncharge_abort()
+{
+  RCLCPP_WARN(this->get_logger(), "Aborting");
+  
+  // Cancel actions
+  move_action_client_->async_cancel_all_goals();
+
+  //Send result
+  auto result = std::make_shared<Uncharge::Result>();
+  result->response.message = "Uncharge aborted, there are some failures during the procedure";
+  result->response.success = false;
+
+  current_uncharge_handle_->abort(result);
 
 
 }

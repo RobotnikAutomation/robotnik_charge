@@ -30,7 +30,8 @@ RobotnikCharge::RobotnikCharge()
     "battery_estimator/data", 10,
     std::bind(&RobotnikCharge::battery_status_callback, this, _1));
 
-  // Service client to set relay
+  
+    // Service client to set relay
   set_charger_relay_ = this->create_client<SetBool>("charge_manager/set_charger_relay");
 
   while (!set_charger_relay_->wait_for_service(1s))
@@ -66,6 +67,11 @@ RobotnikCharge::RobotnikCharge()
                                                                 std::bind(&RobotnikCharge::charge_handle_cancel, this, _1),
                                                                 std::bind(&RobotnikCharge::charge_handle_accepted, this, _1));
 
+  //Uncharge Action Server
+  uncharge_action_server_ = rclcpp_action::create_server<Uncharge>(this, "uncharge",
+    std::bind(&RobotnikCharge::uncharge_handle_goal, this, _1, _2),
+    std::bind(&RobotnikCharge::uncharge_handle_cancel, this, _1),
+    std::bind(&RobotnikCharge::uncharge_handle_accepted, this, _1));
 
   last_battery_msg_ = this->get_clock()->now();
   is_charging_ = false;
@@ -180,7 +186,7 @@ rclcpp_action::CancelResponse RobotnikCharge::charge_handle_cancel(const std::sh
   move_action_client_->async_cancel_all_goals();
 
   //Change Laser Mode
-  change_laser_mode();
+  change_laser_mode(true);
 
   (void)goal_handle;
   // Change State
@@ -226,7 +232,7 @@ void RobotnikCharge::execute_charge(const std::shared_ptr<GoalHandleCharge> goal
     switch (charge_manager_state_)
     {
     case RobotnikChargeState::DeactivatingLasers:      
-      change_laser_mode();
+      change_laser_mode(false);
       charge_manager_state_ = RobotnikChargeState::InitDocking;
       break;
     
@@ -263,7 +269,7 @@ void RobotnikCharge::execute_charge(const std::shared_ptr<GoalHandleCharge> goal
       break;
   
     case RobotnikChargeState::ActivateRelay:
-      activate_relay();
+      change_relay_mode(true);
       charge_manager_state_ = RobotnikChargeState::WaitCharging;
       break;
 
@@ -281,7 +287,7 @@ void RobotnikCharge::execute_charge(const std::shared_ptr<GoalHandleCharge> goal
     
     case RobotnikChargeState::Charging: 
       charge_manager_state_ = RobotnikChargeState::Finished;        
-      send_result(true);
+      send_charge_result(true);
       return;
       break;
     
@@ -299,14 +305,14 @@ void RobotnikCharge::execute_charge(const std::shared_ptr<GoalHandleCharge> goal
 
     case RobotnikChargeState::Cancelled:
       charge_manager_state_ = RobotnikChargeState::Finished;     
-      send_feedback();
+      send_charge_feedback();
       return;
       break;
 
     case RobotnikChargeState::Aborted:   
-      abort();   
+      charge_abort();   
       charge_manager_state_ = RobotnikChargeState::Finished;
-      send_feedback();
+      send_charge_feedback();
       return;
       break;
     
@@ -326,12 +332,154 @@ void RobotnikCharge::execute_charge(const std::shared_ptr<GoalHandleCharge> goal
       charge_manager_state_ = RobotnikChargeState::Charging;
     }
 
-    send_feedback();
+    send_charge_feedback();
     loop_rate.sleep();
 
   }
 
-  send_result(false);
+  send_charge_result(false);
+  charge_manager_state_ = RobotnikChargeState::Finished;
+
+}
+
+// Uncharge Handle
+rclcpp_action::GoalResponse RobotnikCharge::uncharge_handle_goal(const rclcpp_action::GoalUUID &uuid,
+  std::shared_ptr<const Uncharge::Goal> goal)
+{
+  RCLCPP_INFO(this->get_logger(), "Uncharge action received");
+  (void)goal;
+
+  if(not (charge_manager_state_ == RobotnikChargeState::Init) and not (charge_manager_state_ == RobotnikChargeState::Finished))
+  {
+    rclcpp_action::GoalResponse response = rclcpp_action::GoalResponse::REJECT;
+    RCLCPP_ERROR(this->get_logger(), "There is any other action working");
+    return response;
+  }
+
+  // Check if robot is already charging
+  if ((this->get_clock()->now() - last_battery_msg_).seconds() > 5.0)
+  {
+    rclcpp_action::GoalResponse response = rclcpp_action::GoalResponse::REJECT;
+    RCLCPP_ERROR(this->get_logger(), "Battery msg not updated in the last 5 second");
+    return response;
+  }
+
+  if (not is_charging_)
+  {
+    RCLCPP_WARN(this->get_logger(), "Robot is not charging");
+    rclcpp_action::GoalResponse response = rclcpp_action::GoalResponse::REJECT;
+    return response;
+  }
+
+  if (!move_action_client_->wait_for_action_server(std::chrono::seconds(10)))
+  {
+    RCLCPP_ERROR(this->get_logger(), "Move server not available after waiting");
+    rclcpp_action::GoalResponse response = rclcpp_action::GoalResponse::REJECT;
+    return response;
+  }
+
+  // TODO: Safety service
+  if(params_.has_safety_lasers)
+  {
+    RCLCPP_WARN(this->get_logger(), "Changing Lasers mode");
+  }
+
+  RCLCPP_WARN(this->get_logger(), "Goal with uuid: %d Accepted", uuid[0]);
+
+  rclcpp_action::GoalResponse response = rclcpp_action::GoalResponse::ACCEPT_AND_EXECUTE;
+  charge_manager_state_ = RobotnikChargeState::Ready;
+  return response;
+}
+
+rclcpp_action::CancelResponse RobotnikCharge::uncharge_handle_cancel(const std::shared_ptr<GoalHandleUncharge> goal_handle)
+{
+
+  // Cancel actions
+  move_action_client_->async_cancel_all_goals();
+
+  //Change Laser Mode
+  change_laser_mode(false);
+
+  (void)goal_handle;
+  // Change State
+  charge_manager_state_ = RobotnikChargeState::Cancelled;
+
+  RCLCPP_WARN(this->get_logger(), "Goal Cancelled");
+  return rclcpp_action::CancelResponse::ACCEPT;
+
+}
+
+void RobotnikCharge::uncharge_handle_accepted(const std::shared_ptr<GoalHandleUncharge> goal_handle)
+{
+  if(charge_manager_state_ == RobotnikChargeState::Ready)
+  {
+    std::thread{std::bind(&RobotnikCharge::execute_uncharge, this, goal_handle)}.detach();
+  }
+}
+
+void RobotnikCharge::execute_uncharge(const std::shared_ptr<GoalHandleUncharge> goal_handle)
+{
+
+  // Goal Accepted
+  RCLCPP_INFO(this->get_logger(), "GOAL ACCEPTED");
+  rclcpp::Rate loop_rate(params_.rate);
+
+  current_uncharge_handle_ = goal_handle;
+
+  charge_manager_state_ = RobotnikChargeState::DeactivateRelay;
+
+
+  while(rclcpp::ok())
+  {
+
+    switch (charge_manager_state_)
+    {
+    case RobotnikChargeState::DeactivateRelay:
+      change_relay_mode(false);
+      charge_manager_state_ = RobotnikChargeState::InitMoving;
+      break;
+
+    case RobotnikChargeState::InitMoving:
+      send_move_backwards();
+      charge_manager_state_ = RobotnikChargeState::MovingBackwards;
+      break;
+
+    case RobotnikChargeState::MovingBackwards:
+      if(move_finished_){
+        charge_manager_state_ = RobotnikChargeState::ActivatingLasers;
+      }
+      break;
+
+    case RobotnikChargeState::ActivatingLasers:
+      change_laser_mode(true);
+      charge_manager_state_ = RobotnikChargeState::Finished;        
+      send_uncharge_result(true);
+      return;
+      break;
+    
+    case RobotnikChargeState::Cancelled:
+      charge_manager_state_ = RobotnikChargeState::Finished;     
+      send_uncharge_feedback();
+      return;
+      break;
+
+    case RobotnikChargeState::Aborted:   
+      uncharge_abort();   
+      charge_manager_state_ = RobotnikChargeState::Finished;
+      send_uncharge_feedback();
+      return;
+      break;
+
+    default:
+      break;
+    }
+
+    send_uncharge_feedback();
+    loop_rate.sleep();
+
+  }
+
+  send_uncharge_result(false);
   charge_manager_state_ = RobotnikChargeState::Finished;
 
 }

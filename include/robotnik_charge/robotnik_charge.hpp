@@ -8,12 +8,12 @@
 #include "rclcpp_action/rclcpp_action.hpp"
 #include "robotnik_battery_msgs/msg/battery_status.hpp"
 #include "robotnik_navigation_msgs/action/charge.hpp"
+#include "robotnik_navigation_msgs/action/uncharge.hpp"
 #include "robotnik_navigation_msgs/action/dock.hpp"
 #include "robotnik_navigation_msgs/action/move.hpp"
 #include "geometry_msgs/msg/pose2_d.hpp"
 #include "geometry_msgs/msg/twist.hpp"
 #include "std_srvs/srv/set_bool.hpp"
-#include "std_srvs/srv/trigger.hpp"
 
 #include "rclcpp_action/rclcpp_action.hpp"
 #include "robotnik_charge/robotnik_charge_parameters.hpp"
@@ -28,35 +28,38 @@ enum RobotnikChargeState
   Init = 0,
   Ready = 1,
   DeactivatingLasers = 2,
-  InitDocking = 3,
-  Docking = 4,
-  EndDocking = 5,
-  InitMoving = 6,
-  Moving = 7,
-  EndMoving = 8,
-  ActivateRelay = 9,
-  WaitCharging = 10,
-  Charging = 11,
-  Cancelled = 12,
-  Aborted = 13,
-  Retry = 14,
-  MovingBackwards = 15,
-  Finished = 16
+  ActivatingLasers = 3,
+  InitDocking = 4,
+  Docking = 5,
+  EndDocking = 6,
+  InitMoving = 7,
+  Moving = 8,
+  EndMoving = 9,
+  ActivateRelay = 10,
+  DeactivateRelay = 11,
+  WaitCharging = 12,
+  Charging = 13,
+  Cancelled = 14,
+  Aborted = 15,
+  Retry = 16,
+  MovingBackwards = 17,
+  Finished = 18
 };
 class RobotnikCharge : public rclcpp::Node
 {
 public:
   using BatteryStatus = robotnik_battery_msgs::msg::BatteryStatus;
   using Charge = robotnik_navigation_msgs::action::Charge;
+  using Uncharge = robotnik_navigation_msgs::action::Uncharge;
   using Dock = robotnik_navigation_msgs::action::Dock;
   using Move = robotnik_navigation_msgs::action::Move;
   using GoalHandleCharge = rclcpp_action::ServerGoalHandle<Charge>;
+  using GoalHandleUncharge = rclcpp_action::ServerGoalHandle<Uncharge>;
   using GoalHandleDock = rclcpp_action::ClientGoalHandle<Dock>;
   using GoalHandleMove = rclcpp_action::ClientGoalHandle<Move>;
   using SetBool = std_srvs::srv::SetBool;
   using Pose = geometry_msgs::msg::Pose2D;
   using Twist = geometry_msgs::msg::Twist;
-  using Trigger = std_srvs::srv::Trigger;
 
   explicit RobotnikCharge();
 
@@ -68,10 +71,10 @@ private:
   void execute_charge(const std::shared_ptr<GoalHandleCharge> goal_handle);
 
   //Uncharge
-  // rclcpp_action::GoalResponse charge_handle_goal(const rclcpp_action::GoalUUID & uuid, std::shared_ptr<const Charge::Goal> goal);
-  // rclcpp_action::CancelResponse charge_handle_cancel(const std::shared_ptr<GoalHandleCharge> goal_handle);
-  // void charge_handle_accepted(const std::shared_ptr<GoalHandleCharge> goal_handle);
-  // void execute_charge(const std::shared_ptr<GoalHandleCharge> goal_handle);
+  rclcpp_action::GoalResponse uncharge_handle_goal(const rclcpp_action::GoalUUID & uuid, std::shared_ptr<const Uncharge::Goal> goal);
+  rclcpp_action::CancelResponse uncharge_handle_cancel(const std::shared_ptr<GoalHandleUncharge> goal_handle);
+  void uncharge_handle_accepted(const std::shared_ptr<GoalHandleUncharge> goal_handle);
+  void execute_uncharge(const std::shared_ptr<GoalHandleUncharge> goal_handle);
 
   // Callback
   void dock_goal_callback(const GoalHandleDock::SharedPtr & goal_handle);
@@ -85,15 +88,19 @@ private:
   void battery_status_callback(const BatteryStatus::SharedPtr msg);
 
   // Atomic Actions
-  void send_feedback();
-  void send_result(bool success);
+  void send_charge_feedback();
+  void send_charge_result(bool success);
+  void send_uncharge_feedback();
+  void send_uncharge_result(bool success);
   void wait_charging();
   void send_dock_goal();
   void send_move_goal();
-  void activate_relay();
-  void change_laser_mode();
+  void send_move_backwards();
+  void change_relay_mode(bool activate);
+  void change_laser_mode(bool activate);
   void retry();
-  void abort();
+  void charge_abort();
+  void uncharge_abort();
 
   std::string state_to_text(RobotnikChargeState state);
 
@@ -115,6 +122,7 @@ private:
   rclcpp_action::Client<Move>::SendGoalOptions move_send_goal_options_;
 
   rclcpp_action::Server<Charge>::SharedPtr charge_action_server_;
+  rclcpp_action::Server<Uncharge>::SharedPtr uncharge_action_server_;
 
   //Variables
   int try_number_;
@@ -131,6 +139,7 @@ private:
   std::unique_ptr<tf2_ros::Buffer> tf_buffer_;
 
 
+  std::shared_ptr<GoalHandleUncharge> current_uncharge_handle_;
   std::shared_ptr<GoalHandleCharge> current_charge_handle_;
   Charge::Goal current_goal_;
 
