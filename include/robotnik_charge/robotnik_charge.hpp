@@ -13,6 +13,7 @@
 #include "geometry_msgs/msg/pose2_d.hpp"
 #include "geometry_msgs/msg/twist.hpp"
 #include "std_srvs/srv/set_bool.hpp"
+#include "std_srvs/srv/trigger.hpp"
 
 #include "rclcpp_action/rclcpp_action.hpp"
 #include "robotnik_charge/robotnik_charge_parameters.hpp"
@@ -39,7 +40,8 @@ enum RobotnikChargeState
   Cancelled = 12,
   Aborted = 13,
   Retry = 14,
-  MovingBackwards = 15
+  MovingBackwards = 15,
+  Finished = 16
 };
 class RobotnikCharge : public rclcpp::Node
 {
@@ -54,13 +56,22 @@ public:
   using SetBool = std_srvs::srv::SetBool;
   using Pose = geometry_msgs::msg::Pose2D;
   using Twist = geometry_msgs::msg::Twist;
+  using Trigger = std_srvs::srv::Trigger;
 
   explicit RobotnikCharge();
 
 private:
-  rclcpp_action::GoalResponse handle_goal(const rclcpp_action::GoalUUID & uuid, std::shared_ptr<const Charge::Goal> goal);
-  rclcpp_action::CancelResponse handle_cancel(const std::shared_ptr<GoalHandleCharge> goal_handle);
-  void handle_accepted(const std::shared_ptr<GoalHandleCharge> goal_handle);
+  //Charge
+  rclcpp_action::GoalResponse charge_handle_goal(const rclcpp_action::GoalUUID & uuid, std::shared_ptr<const Charge::Goal> goal);
+  rclcpp_action::CancelResponse charge_handle_cancel(const std::shared_ptr<GoalHandleCharge> goal_handle);
+  void charge_handle_accepted(const std::shared_ptr<GoalHandleCharge> goal_handle);
+  void execute_charge(const std::shared_ptr<GoalHandleCharge> goal_handle);
+
+  //Uncharge
+  // rclcpp_action::GoalResponse charge_handle_goal(const rclcpp_action::GoalUUID & uuid, std::shared_ptr<const Charge::Goal> goal);
+  // rclcpp_action::CancelResponse charge_handle_cancel(const std::shared_ptr<GoalHandleCharge> goal_handle);
+  // void charge_handle_accepted(const std::shared_ptr<GoalHandleCharge> goal_handle);
+  // void execute_charge(const std::shared_ptr<GoalHandleCharge> goal_handle);
 
   // Callback
   void dock_goal_callback(const GoalHandleDock::SharedPtr & goal_handle);
@@ -84,7 +95,6 @@ private:
   void retry();
   void abort();
 
-  void execute_charging(const std::shared_ptr<GoalHandleCharge> goal_handle);
   std::string state_to_text(RobotnikChargeState state);
 
   // Params

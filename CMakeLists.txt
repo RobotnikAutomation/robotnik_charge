@@ -30,7 +30,7 @@ generate_parameter_library(robotnik_charge_parameters
   TARGET_NAMESPACE robotnik_charge
 )
 
-add_executable(robotnik_charge src/robotnik_charge.cpp src/robotnik_charge_node.cpp)
+add_executable(robotnik_charge src/robotnik_charge.cpp src/robotnik_charge_node.cpp src/atomic_actions.cpp src/action_clients.cpp)
 
 target_link_libraries(robotnik_charge robotnik_charge_parameters)
 
