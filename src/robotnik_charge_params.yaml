@@ -8,7 +8,7 @@ robotnik_charge:
     validation:
       gt<>: 0
 
-  charge_timeout:
+  charge_action_timeout:
     type: double
     default_value: 60.0
     read_only: true

@@ -173,12 +173,16 @@ rclcpp_action::CancelResponse RobotnikCharge::handle_cancel(const std::shared_pt
   dock_action_client_->async_cancel_all_goals();
   move_action_client_->async_cancel_all_goals();
 
+  //Change Laser Mode
+  change_laser_mode();
+
   (void)goal_handle;
   // Change State
   charge_manager_state_ = RobotnikChargeState::Cancelled;
 
   RCLCPP_WARN(this->get_logger(), "Goal Cancelled");
   return rclcpp_action::CancelResponse::ACCEPT;
+
 }
 
 void RobotnikCharge::handle_accepted(const std::shared_ptr<GoalHandleCharge> goal_handle)
@@ -270,7 +274,7 @@ void RobotnikCharge::execute_charging(const std::shared_ptr<GoalHandleCharge> go
       break;
     
     case RobotnikChargeState::Charging:      
-      send_result();
+      send_result(true);
       return;
       break;
     
@@ -299,7 +303,7 @@ void RobotnikCharge::execute_charging(const std::shared_ptr<GoalHandleCharge> go
       break;
     }
 
-    if((this->get_clock()->now()-init_charging_time_).seconds() > params_.charge_timeout)
+    if((this->get_clock()->now()-init_charging_time_).seconds() > params_.charge_action_timeout)
     {
       RCLCPP_ERROR(this->get_logger(), "Charging timeout, ABORT! (Current action time: %f)", init_charging_time_.seconds());
       charge_manager_state_ = RobotnikChargeState::Aborted;
@@ -316,11 +320,7 @@ void RobotnikCharge::execute_charging(const std::shared_ptr<GoalHandleCharge> go
 
   }
 
-  auto result = std::make_shared<Charge::Result>();
-
-  result->response.message = "Robot is not Charging";
-  result->response.success = false;
-  current_charge_handle_->abort(result);
+  send_result(false);
 
 }
 
@@ -530,7 +530,7 @@ void RobotnikCharge::retry()
   move_finished_ = false;
   Move::Goal move_goal;
   Pose target;
-  target.x = -1.0;
+  target.x = -0.5;
   move_goal.goal = target;
 
   move_action_client_->async_send_goal(move_goal, move_send_goal_options_);
@@ -548,13 +548,21 @@ void RobotnikCharge::send_feedback()
   current_charge_handle_->publish_feedback(feedback);
 }
 
-void RobotnikCharge::send_result()
+void RobotnikCharge::send_result(bool success)
 {
   auto result = std::make_shared<Charge::Result>();
 
-  result->response.message = "Robot is Charging";
-  result->response.success = true;
-  current_charge_handle_->succeed(result);
+  if(success)
+  {
+    result->response.message = "Robot is Charging";
+    result->response.success = true;
+    current_charge_handle_->succeed(result);
+  }else
+  {
+    result->response.message = "Robot is not Charging after action finished";
+    result->response.success = false;
+    current_charge_handle_->abort(result);
+  }
 }
 
 void RobotnikCharge::abort()

@@ -75,7 +75,7 @@ private:
 
   // Atomic Actions
   void send_feedback();
-  void send_result();
+  void send_result(bool success);
   void wait_charging();
   void send_dock_goal();
   void send_move_goal();

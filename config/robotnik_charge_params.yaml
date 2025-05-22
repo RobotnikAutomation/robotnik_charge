@@ -1,9 +1,10 @@
 robot:
   robotnik_charge:
     ros__parameters:
+
       rate: 10
-      charge_timeout: 60.0
-      timeout_charging_detection: 1
+      charge_action_timeout: 60.0
+      timeout_charging_detection: 5
       dock_action: "accurate_smooth_dock/dock"
       move_action: "move"
       charge_contact_distance_from_marker: 0.105
@@ -12,9 +13,6 @@ robot:
       max_velocity_y: 0.1 
       max_velocity_yaw: 0.1
 
-
-      dock_action: "accurate_smooth_dock/dock"
-      move_action: "move"
       # marker
       # offset X
       # predock_offset
