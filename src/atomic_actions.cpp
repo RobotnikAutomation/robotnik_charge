@@ -1,4 +1,6 @@
 #include "robotnik_charge/robotnik_charge.hpp"
+
+#include <robotnik_common_msgs/srv/set_string.hpp>
 #include <thread>
 
 using namespace std::chrono_literals;
@@ -10,12 +12,25 @@ namespace robotnik_charge
 /******* Atomic Actions *******/
 void RobotnikCharge::change_laser_mode(bool activate)
 {
-  RCLCPP_INFO(this->get_logger(), "Changing Laser mode");
-
   //Change Mode
-  /*TO DO*/
+  auto request = std::make_shared<robotnik_common_msgs::srv::SetString::Request>();
+  request->data = activate ? "docking" : "standard";
 
+  RCLCPP_INFO(this->get_logger(), "Changing laser mode to %s", request->data.c_str());
+  while (!set_laser_mode_->wait_for_service(1s))
+  {
+    if (!rclcpp::ok())
+    {
+      RCLCPP_ERROR(this->get_logger(), "Interrupted while waiting for the service charge_manager/set_laser_mode. Exiting.");
+      charge_manager_state_ = RobotnikChargeState::Aborted;
+      return;
+    }
+    RCLCPP_INFO(this->get_logger(), "charge_manager/set_laser_mode not available, waiting again...");
+  }
 
+  set_laser_mode_->async_send_request(request);
+
+  RCLCPP_INFO(this->get_logger(), "Laser mode changed to %s", request->data.c_str());
 }
 
 void RobotnikCharge::send_dock_goal()
@@ -37,7 +52,7 @@ void RobotnikCharge::send_dock_goal()
   dock_goal.dock_offset = offset;
 
   dock_action_client_->async_send_goal(dock_goal, dock_send_goal_options_);
-  
+
 }
 
 void RobotnikCharge::send_move_goal()
@@ -66,7 +81,7 @@ void RobotnikCharge::send_move_goal()
   move_goal.goal = target;
 
   move_action_client_->async_send_goal(move_goal, move_send_goal_options_);
-  
+
 }
 
 void RobotnikCharge::change_relay_mode(bool activate)
@@ -76,10 +91,9 @@ void RobotnikCharge::change_relay_mode(bool activate)
     RCLCPP_INFO(this->get_logger(), "Charge relay mode to true");
   }else
   {
-      
-    RCLCPP_INFO(this->get_logger(), "Charge relay mode to false"); 
+    RCLCPP_INFO(this->get_logger(), "Charge relay mode to false");
   }
-  
+
   auto request = std::make_shared<SetBool::Request>();
 
   request->data = activate;
@@ -190,7 +204,7 @@ void RobotnikCharge::send_uncharge_result(bool success)
 void RobotnikCharge::charge_abort()
 {
   RCLCPP_WARN(this->get_logger(), "Aborting");
-  
+
   // Cancel actions
   dock_action_client_->async_cancel_all_goals();
   move_action_client_->async_cancel_all_goals();
@@ -208,7 +222,7 @@ void RobotnikCharge::charge_abort()
 void RobotnikCharge::uncharge_abort()
 {
   RCLCPP_WARN(this->get_logger(), "Aborting");
-  
+
   // Cancel actions
   move_action_client_->async_cancel_all_goals();
 
@@ -226,78 +240,78 @@ std::string RobotnikCharge::state_to_text(RobotnikChargeState state)
 {
   switch (state)
     {
-    case RobotnikChargeState::Init:      
+    case RobotnikChargeState::Init:
       return "Init";
       break;
 
-    case RobotnikChargeState::Ready:      
+    case RobotnikChargeState::Ready:
       return "Ready";
       break;
 
-    case RobotnikChargeState::DeactivatingLasers:      
+    case RobotnikChargeState::DeactivatingLasers:
       return "DeactivatingLasers";
       break;
-    
-    case RobotnikChargeState::InitDocking:      
+
+    case RobotnikChargeState::InitDocking:
       return "InitDocking";
       break;
 
-    case RobotnikChargeState::Docking:  
-      return "Docking";   
+    case RobotnikChargeState::Docking:
+      return "Docking";
       break;
-    
-    case RobotnikChargeState::EndDocking:      
+
+    case RobotnikChargeState::EndDocking:
       return "EndDocking";
       break;
 
-    case RobotnikChargeState::InitMoving:      
+    case RobotnikChargeState::InitMoving:
       return "InitMoving";
       break;
 
-    case RobotnikChargeState::Moving:      
+    case RobotnikChargeState::Moving:
       return "Moving";
       break;
 
-    case RobotnikChargeState::EndMoving:      
+    case RobotnikChargeState::EndMoving:
       return "EndMoving";
       break;
-  
-    case RobotnikChargeState::ActivateRelay:      
+
+    case RobotnikChargeState::ActivateRelay:
       return "ActivateRelay";
       break;
-    
-    case RobotnikChargeState::WaitCharging:      
+
+    case RobotnikChargeState::WaitCharging:
       return "WaitCharging";
       break;
 
-    case RobotnikChargeState::Charging:      
+    case RobotnikChargeState::Charging:
       return "Charging";
       break;
-    
-    case RobotnikChargeState::Cancelled:      
+
+    case RobotnikChargeState::Cancelled:
       return "Cancelled";
       break;
 
-    case RobotnikChargeState::Aborted:      
+    case RobotnikChargeState::Aborted:
       return "Aborted";
       break;
 
-    case RobotnikChargeState::Retry:      
+    case RobotnikChargeState::Retry:
       return "Retry";
       break;
 
-    case RobotnikChargeState::MovingBackwards:      
+    case RobotnikChargeState::MovingBackwards:
       return "MovingBackwards";
       break;
 
-      case RobotnikChargeState::Finished:      
+      case RobotnikChargeState::Finished:
       return "Finished";
       break;
 
-    
+
       default:
       return "Invalid State";
       break;
-  } 
+  }
 }
 }

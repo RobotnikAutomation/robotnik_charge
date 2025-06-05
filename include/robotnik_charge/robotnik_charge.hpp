@@ -15,6 +15,8 @@
 #include "geometry_msgs/msg/twist.hpp"
 #include "std_srvs/srv/set_bool.hpp"
 
+#include <robotnik_common_msgs/srv/set_string.hpp>
+
 #include "rclcpp_action/rclcpp_action.hpp"
 #include "robotnik_charge/robotnik_charge_parameters.hpp"
 #include "tf2/exceptions.h"
@@ -57,6 +59,7 @@ public:
   using GoalHandleUncharge = rclcpp_action::ServerGoalHandle<Uncharge>;
   using GoalHandleDock = rclcpp_action::ClientGoalHandle<Dock>;
   using GoalHandleMove = rclcpp_action::ClientGoalHandle<Move>;
+  using SetString = robotnik_common_msgs::srv::SetString;
   using SetBool = std_srvs::srv::SetBool;
   using Pose = geometry_msgs::msg::Pose2D;
   using Twist = geometry_msgs::msg::Twist;
@@ -114,6 +117,7 @@ private:
   rclcpp::Subscription<BatteryStatus>::SharedPtr battery_status_subscription_;
 
   rclcpp::Client<SetBool>::SharedPtr set_charger_relay_;
+  rclcpp::Client<SetString>::SharedPtr set_laser_mode_;
 
   rclcpp_action::Client<Dock>::SharedPtr dock_action_client_;
   rclcpp_action::Client<Dock>::SendGoalOptions dock_send_goal_options_;
