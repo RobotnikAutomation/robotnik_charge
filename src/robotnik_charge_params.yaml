@@ -47,6 +47,31 @@ robotnik_charge:
     default_value: false
     description: "If the robot has safety lasers, the safety mode must change. default: false"
 
+  laser_mode_during_action:
+    type: string
+    default_value: "docking"
+    description: "Laser mode during the charge or uncharge action. default: docking"
+
+  laser_mode_after_action:
+    type: string
+    default_value: "standard"
+    description: "Laser mode at the end of the uncharge action. default: standard"
+
+  step_back_distance:
+    type: double
+    default_value: 0.5
+    description: "Distance to step back during uncharge. default: 0.5"
+    validation:
+      gt<>: 0
+
+  rotation:
+    type: double
+    default_value: 0.0
+    description: "Rotation to apply after uncharge step back. default: 0.0"
+    validation:
+      gt_eq<>: -3.14
+      lt_eq<>: 3.14
+
   max_velocity_x:
     type: double
     default_value: 1.0

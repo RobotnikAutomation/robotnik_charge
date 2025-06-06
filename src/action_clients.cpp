@@ -40,15 +40,15 @@ void RobotnikCharge::dock_result_callback(const GoalHandleDock::WrappedResult &r
 
   switch (result.code)
   {
-  case rclcpp_action::ResultCode::SUCCEEDED:
-    RCLCPP_INFO(this->get_logger(), "Dock succeeded. Proceeding to move.");
-    break;
-  case rclcpp_action::ResultCode::ABORTED:
-  case rclcpp_action::ResultCode::CANCELED:
-  default:
-    RCLCPP_ERROR(this->get_logger(), "Docking failed.");
-    charge_manager_state_ = RobotnikChargeState::Aborted;
-    break;
+    case rclcpp_action::ResultCode::SUCCEEDED:
+      RCLCPP_INFO(this->get_logger(), "Dock succeeded. Proceeding to move.");
+      break;
+    case rclcpp_action::ResultCode::ABORTED:
+    case rclcpp_action::ResultCode::CANCELED:
+    default:
+      RCLCPP_ERROR(this->get_logger(), "Docking failed.");
+      charge_manager_state_ = RobotnikChargeState::Aborted;
+      break;
   }
 }
 
@@ -83,15 +83,15 @@ void RobotnikCharge::move_result_callback(const GoalHandleMove::WrappedResult &r
 
   switch (result.code)
   {
-  case rclcpp_action::ResultCode::SUCCEEDED:
-    RCLCPP_INFO(this->get_logger(), "Move succeeded.");
-    break;
-  case rclcpp_action::ResultCode::ABORTED:
-  case rclcpp_action::ResultCode::CANCELED:
-  default:
-    RCLCPP_ERROR(this->get_logger(), "Move failed.");
-    charge_manager_state_ = RobotnikChargeState::Aborted;
-    break;
+    case rclcpp_action::ResultCode::SUCCEEDED:
+      RCLCPP_INFO(this->get_logger(), "Move succeeded.");
+      break;
+    case rclcpp_action::ResultCode::ABORTED:
+    case rclcpp_action::ResultCode::CANCELED:
+    default:
+      RCLCPP_ERROR(this->get_logger(), "Move failed.");
+      charge_manager_state_ = RobotnikChargeState::Aborted;
+      break;
   }
 
 }

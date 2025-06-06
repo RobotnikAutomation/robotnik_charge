@@ -40,7 +40,7 @@ The charge process follows the next steps:
 If there is any issue with this, the action will be rejected.
 
 #### Charge action
-1. If the robot has safety laser, change the mode **(Still pending to be implemented)**
+1. If the robot has safety laser, change to the mode during action**(Still pending to be implemented)**
 2. Send dock goal with offset.
 3. Once dock is compleated, send move goal.
 4. Once move is compleated, activate relay.
@@ -72,8 +72,10 @@ If there is any issue with this, the action will be rejected.
 #### Uncharge action
 
 1. Deactivate relay.
-2. Move backwards.
-3. Once the move finishes, change laser mode.
+2. If the robot has safety laser, change to the mode during action **(Still pending to be implemented)**
+3. Move backwards.
+4. Rotate.
+5. If the robot has safety laser, change to the mode after action **(Still pending to be implemented)**
 
 If during the process there is any failure, the action is aborted.
 
@@ -83,56 +85,76 @@ There is a [config file](/config/robotnik_charge_params.yaml) where the paramete
 
 These are the parameters:
 
-  **rate**:
-    type: int
-    default_value: 10
-    read_only: true
-    description: "Frequency to run the action. default: 10"
+  * **rate**:
+    * type: int
+    * default_value: 10
+    * read_only: true
+    * description: "Frequency to run the action. default: 10"
 
-  **charge_action_timeout**:
-    type: double
-    default_value: 60.0
-    read_only: true
-    description: "Seconds of timeout that the charging method must last. default: 60.0"
+  * **charge_action_timeout**:
+    * type: double
+    * default_value: 60.0
+    * read_only: true
+    * description: "Seconds of timeout that the charging method must last. default: 60.0"
 
-  **dock_action**:
-    type: string
-    default_value: "/smooth_drive/dock"
-    description: "Name of dock action. default: /smooth_drive/dock"
+  * **dock_action**:
+    * type: string
+    * default_value: "/smooth_drive/dock"
+    * description: "Name of dock action. default: /smooth_drive/dock"
 
-  **move_action**:
-    type: string
-    default_value: "/move"
-    description: "Name of move action. default: /move"
+  * **move_action**:
+    * type: string
+    * default_value: "/move"
+    * description: "Name of move action. default: /move"
 
-  **charge_contact_distance_from_marker**:
-    type: double
-    default_value: 0.14
-    read_only: true
-    description: "Distance from marker to charge contact in docking station. default: 0.14"
+  * **charge_contact_distance_from_marker**:
+    * type: double
+    * default_value: 0.14
+    * read_only: true
+    * description: "Distance from marker to charge contact in docking station. default: 0.14"
 
-  **timeout_charging_detection**:
-    type: int
-    default_value: 1
-    read_only: true
-    description: "Seconds to wait to detect charge. default: 1"
+  * **timeout_charging_detection**:
+    * type: int
+    * default_value: 1
+    * read_only: true
+    * description: "Seconds to wait to detect charge. default: 1"
 
-  **has_safety_lasers**:
-    type: bool
-    default_value: false
-    description: "If the robot has safety lasers, the safety mode must change. default: false"
+  * **has_safety_lasers**:
+    * type: bool
+    * default_value: false
+    * description: "If the robot has safety lasers, the safety mode must change. default: false"
 
-  **max_velocity_x**:
-    type: double
-    default_value: 1.0
-    description: "Maximum velocity in x axis. default: 1.0"
+  * **laser_mode_during_action**:
+    * type: string
+    * default_value: "docking"
+    * description: "Laser mode during the charge or uncharge action. default: docking"
 
-  **max_velocity_y**:
-    type: double
-    default_value: 0.0
-    description: "Maximum velocity in y axis. default: 0.0"
+  * **laser_mode_after_action**:
+    * type: string
+    * default_value: "standard"
+    * description: "Laser mode at the end of the uncharge action. default: standard"
 
-  **max_velocity_yaw**:
-    type: double
-    default_value: 1.0
-    description: "Maximum velocity in yaw. default: 1.0"
+  * **step_back_distance**:
+    * type: double
+    * default_value: 0.5
+    * description: "Distance to step back during uncharge. default: 0.5"
+ 
+  * **rotation**:
+    * type: double
+    * default_value: 0.0
+    * description: "Rotation to apply after uncharge step back. default: 0.0"
+
+  * **max_velocity_x**:
+    * type: double
+    * default_value: 1.0
+    * description: "Maximum velocity in x axis. default: 1.0"
+
+  * **max_velocity_y**:
+    * type: double
+    * default_value: 0.0
+    * description: "Maximum velocity in y axis. default: 0.0"
+
+  * **max_velocity_yaw**:
+    * type: double
+    * default_value: 1.0
+    * description: "Maximum velocity in yaw. default: 1.0"

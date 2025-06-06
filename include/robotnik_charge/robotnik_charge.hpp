@@ -45,7 +45,9 @@ enum RobotnikChargeState
   Aborted = 15,
   Retry = 16,
   MovingBackwards = 17,
-  Finished = 18
+  InitRotating = 18,
+  Rotating = 19,
+  Finished = 20
 };
 class RobotnikCharge : public rclcpp::Node
 {
@@ -99,6 +101,7 @@ private:
   void send_dock_goal();
   void send_move_goal();
   void send_move_backwards();
+  void send_rotation();
   void change_relay_mode(bool activate);
   void change_laser_mode(bool activate);
   void retry();

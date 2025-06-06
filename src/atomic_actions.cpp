@@ -14,7 +14,7 @@ void RobotnikCharge::change_laser_mode(bool activate)
 {
   //Change Mode
   auto request = std::make_shared<robotnik_common_msgs::srv::SetString::Request>();
-  request->data = activate ? "docking" : "standard";
+  request->data = activate ? params_.laser_mode_during_action : params_.laser_mode_after_action;
 
   RCLCPP_INFO(this->get_logger(), "Changing laser mode to %s", request->data.c_str());
   while (!set_laser_mode_->wait_for_service(1s))
@@ -48,7 +48,7 @@ void RobotnikCharge::send_dock_goal()
   dock_goal.maximum_velocity.angular.z = params_.max_velocity_yaw;
 
   Pose offset;
-  offset.x = -params_.charge_contact_distance_from_marker-current_goal_.dock_offset;
+  offset.x = -params_.charge_contact_distance_from_marker - current_goal_.dock_offset;
   dock_goal.dock_offset = offset;
 
   dock_action_client_->async_send_goal(dock_goal, dock_send_goal_options_);
@@ -89,7 +89,8 @@ void RobotnikCharge::change_relay_mode(bool activate)
   if(activate)
   {
     RCLCPP_INFO(this->get_logger(), "Charge relay mode to true");
-  }else
+  }
+  else
   {
     RCLCPP_INFO(this->get_logger(), "Charge relay mode to false");
   }
@@ -120,7 +121,8 @@ void RobotnikCharge::wait_charging()
   {
     rclcpp::sleep_for(std::chrono::seconds(params_.timeout_charging_detection));
   }
-  else{
+  else
+  {
     RCLCPP_INFO(this->get_logger(), "Last try, waiting 10s");
     rclcpp::sleep_for(10s);
   }
@@ -139,13 +141,25 @@ void RobotnikCharge::retry()
 void RobotnikCharge::send_move_backwards()
 {
 
-    move_finished_ = false;
-    Move::Goal move_goal;
-    Pose target;
-    target.x = -0.5;
-    move_goal.goal = target;
+  move_finished_ = false;
+  Move::Goal move_goal;
+  Pose target;
+  target.x = -params_.step_back_distance;
+  move_goal.goal = target;
 
-    move_action_client_->async_send_goal(move_goal, move_send_goal_options_);
+  move_action_client_->async_send_goal(move_goal, move_send_goal_options_);
+}
+
+void RobotnikCharge::send_rotation()
+{
+  move_finished_ = false;
+  Move::Goal move_goal;
+  Pose target;
+  target.theta = params_.rotation;
+
+  move_goal.goal = target;
+
+  move_action_client_->async_send_goal(move_goal, move_send_goal_options_);
 }
 
 void RobotnikCharge::send_charge_feedback()
@@ -176,7 +190,8 @@ void RobotnikCharge::send_charge_result(bool success)
     result->response.message = "Robot is Charging";
     result->response.success = true;
     current_charge_handle_->succeed(result);
-  }else
+  }
+  else
   {
     result->response.message = "Robot is not Charging after action finished";
     result->response.success = false;
@@ -193,7 +208,8 @@ void RobotnikCharge::send_uncharge_result(bool success)
     result->response.message = "Robot is Uncharged";
     result->response.success = true;
     current_uncharge_handle_->succeed(result);
-  }else
+  }
+  else
   {
     result->response.message = "Robot is Charging or something is wrong";
     result->response.success = false;
@@ -215,8 +231,6 @@ void RobotnikCharge::charge_abort()
   result->response.success = false;
 
   current_charge_handle_->abort(result);
-
-
 }
 
 void RobotnikCharge::uncharge_abort()
@@ -232,8 +246,6 @@ void RobotnikCharge::uncharge_abort()
   result->response.success = false;
 
   current_uncharge_handle_->abort(result);
-
-
 }
 
 std::string RobotnikCharge::state_to_text(RobotnikChargeState state)
@@ -307,7 +319,6 @@ std::string RobotnikCharge::state_to_text(RobotnikChargeState state)
       case RobotnikChargeState::Finished:
       return "Finished";
       break;
-
 
       default:
       return "Invalid State";

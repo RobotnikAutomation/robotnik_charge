@@ -92,11 +92,12 @@ RobotnikCharge::RobotnikCharge()
   move_finished_ = false;
   RCLCPP_INFO(get_logger(), "Robotnik Charge started");
   charge_manager_state_ = RobotnikChargeState::Init;
-
 }
 
-void RobotnikCharge::params_timer_callback() {
-  if (param_listener_->is_old(params_)) {
+void RobotnikCharge::params_timer_callback()
+{
+  if (param_listener_->is_old(params_))
+  {
     param_listener_->refresh_dynamic_parameters();
     params_ = param_listener_->get_params();
     RCLCPP_INFO(get_logger(), "Params updated");
@@ -114,7 +115,6 @@ rclcpp_action::GoalResponse RobotnikCharge::charge_handle_goal(const rclcpp_acti
     return response;
   }
 
-  // Check if robot is already charging
   if ((this->get_clock()->now() - last_battery_msg_).seconds() > 5.0)
   {
     rclcpp_action::GoalResponse response = rclcpp_action::GoalResponse::REJECT;
@@ -122,6 +122,7 @@ rclcpp_action::GoalResponse RobotnikCharge::charge_handle_goal(const rclcpp_acti
     return response;
   }
 
+  // Check if robot is already charging
   if (is_charging_)
   {
     RCLCPP_WARN(this->get_logger(), "Robot is already charging");
@@ -309,7 +310,8 @@ void RobotnikCharge::execute_charge(const std::shared_ptr<GoalHandleCharge> goal
       break;
 
     case RobotnikChargeState::MovingBackwards:
-      if(move_finished_){
+      if(move_finished_)
+      {
         try_number_++;
         charge_manager_state_ = RobotnikChargeState::InitDocking;
       }
@@ -448,6 +450,11 @@ void RobotnikCharge::execute_uncharge(const std::shared_ptr<GoalHandleUncharge> 
     {
     case RobotnikChargeState::DeactivateRelay:
       change_relay_mode(false);
+      charge_manager_state_ = RobotnikChargeState::ActivatingLasers;
+      break;
+
+    case RobotnikChargeState::ActivatingLasers:
+      change_laser_mode(true);
       charge_manager_state_ = RobotnikChargeState::InitMoving;
       break;
 
@@ -458,12 +465,25 @@ void RobotnikCharge::execute_uncharge(const std::shared_ptr<GoalHandleUncharge> 
       break;
 
     case RobotnikChargeState::MovingBackwards:
-      if(move_finished_){
-        charge_manager_state_ = RobotnikChargeState::ActivatingLasers;
+      if(move_finished_)
+      {
+        charge_manager_state_ = RobotnikChargeState::InitRotating;
       }
       break;
 
-    case RobotnikChargeState::ActivatingLasers:
+    case RobotnikChargeState::InitRotating:
+      send_rotation();
+      charge_manager_state_ = RobotnikChargeState::Rotating;
+      break;
+
+    case RobotnikChargeState::Rotating:
+      if(move_finished_)
+      {
+        charge_manager_state_ = RobotnikChargeState::DeactivatingLasers;
+      }
+      break;
+
+    case RobotnikChargeState::DeactivatingLasers:
       change_laser_mode(false);
       charge_manager_state_ = RobotnikChargeState::Finished;
       send_uncharge_result(true);
@@ -504,7 +524,6 @@ void RobotnikCharge::battery_status_callback(const BatteryStatus::SharedPtr msg)
 {
   last_battery_msg_ = this->get_clock()->now();
   is_charging_ = msg->is_charging;
-
 }
 
 }
