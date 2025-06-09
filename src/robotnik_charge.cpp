@@ -370,18 +370,10 @@ rclcpp_action::GoalResponse RobotnikCharge::uncharge_handle_goal(const rclcpp_ac
     return response;
   }
 
-  // Check if robot is already charging
   if ((this->get_clock()->now() - last_battery_msg_).seconds() > 5.0)
   {
     rclcpp_action::GoalResponse response = rclcpp_action::GoalResponse::REJECT;
     RCLCPP_ERROR(this->get_logger(), "Battery msg not updated in the last 5 second");
-    return response;
-  }
-
-  if (not is_charging_)
-  {
-    RCLCPP_WARN(this->get_logger(), "Robot is not charging");
-    rclcpp_action::GoalResponse response = rclcpp_action::GoalResponse::REJECT;
     return response;
   }
 
