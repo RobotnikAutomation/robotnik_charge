@@ -12,6 +12,12 @@ namespace robotnik_charge
 /******* Atomic Actions *******/
 void RobotnikCharge::set_dock_laser_mode(bool activate)
 {
+  if (!params_.has_safety_lasers)
+  {
+    RCLCPP_WARN(this->get_logger(), "Safety lasers are not enabled, skipping laser mode change.");
+    return;
+  }
+
   //Change Mode
   auto request = std::make_shared<robotnik_common_msgs::srv::SetString::Request>();
   request->data = activate ? params_.laser_mode_during_action : params_.laser_mode_after_action;
@@ -21,11 +27,11 @@ void RobotnikCharge::set_dock_laser_mode(bool activate)
   {
     if (!rclcpp::ok())
     {
-      RCLCPP_ERROR(this->get_logger(), "Interrupted while waiting for the service charge_manager/set_laser_mode. Exiting.");
+      RCLCPP_ERROR(this->get_logger(), "Interrupted while waiting for the service %s. Exiting.", set_laser_mode_->get_service_name());
       charge_manager_state_ = RobotnikChargeState::Aborted;
       return;
     }
-    RCLCPP_INFO(this->get_logger(), "charge_manager/set_laser_mode not available, waiting again...");
+    RCLCPP_INFO(this->get_logger(), "%s not available, waiting again...", set_laser_mode_->get_service_name());
   }
 
   set_laser_mode_->async_send_request(request);

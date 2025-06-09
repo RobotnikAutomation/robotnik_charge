@@ -104,47 +104,44 @@ void RobotnikCharge::params_timer_callback()
   }
 }
 
-// Charge Handle
-rclcpp_action::GoalResponse RobotnikCharge::charge_handle_goal(const rclcpp_action::GoalUUID &uuid,
-                                                        std::shared_ptr<const Charge::Goal> goal)
+bool RobotnikCharge::can_charge_be_accepted(std::shared_ptr<const Charge::Goal> goal, std::string& response)
 {
-  if(not (charge_manager_state_ == RobotnikChargeState::Init) and not (charge_manager_state_ == RobotnikChargeState::Finished))
+  // Check if the action server is in a valid state
+  if(not (charge_manager_state_ == RobotnikChargeState::Init) and
+    not (charge_manager_state_ == RobotnikChargeState::Finished))
   {
-    rclcpp_action::GoalResponse response = rclcpp_action::GoalResponse::REJECT;
-    RCLCPP_ERROR(this->get_logger(), "There is any other action working");
-    return response;
+    response = "There is another action running";
+    return false;
   }
 
+  // Check if the battery message is recent
   if ((this->get_clock()->now() - last_battery_msg_).seconds() > 5.0)
   {
-    rclcpp_action::GoalResponse response = rclcpp_action::GoalResponse::REJECT;
-    RCLCPP_ERROR(this->get_logger(), "Battery msg not updated in the last 5 second");
-    return response;
+    response = "Battery msg not updated in the last 5 seconds";
+    return false;
   }
 
-  // Check if robot is already charging
+  // Check if the robot is already charging
   if (is_charging_)
   {
-    RCLCPP_WARN(this->get_logger(), "Robot is already charging");
-    rclcpp_action::GoalResponse response = rclcpp_action::GoalResponse::REJECT;
-    return response;
+    response = "Robot is already charging";
+    return false;
   }
 
-  // Check if frames are empty and exists
+  // Check if the frames are empty
   if (goal->dock_frame.empty())
   {
-    rclcpp_action::GoalResponse response = rclcpp_action::GoalResponse::REJECT;
-    RCLCPP_ERROR(this->get_logger(), "dock_frame is empty");
-    return response;
+    response = "dock_frame is empty";
+    return false;
   }
 
   if (goal->robot_dock_frame.empty())
   {
-    rclcpp_action::GoalResponse response = rclcpp_action::GoalResponse::REJECT;
-    RCLCPP_ERROR(this->get_logger(), "robot_dock_frame is empty");
-    return response;
+    response = "robot_dock_frame is empty";
+    return false;
   }
 
+  // Check if the frames exist and can be transformed
   try
   {
     dock_frame_transform_ = tf_buffer_->lookupTransform(
@@ -153,11 +150,8 @@ rclcpp_action::GoalResponse RobotnikCharge::charge_handle_goal(const rclcpp_acti
   }
   catch (const tf2::TransformException &ex)
   {
-    RCLCPP_ERROR(
-        this->get_logger(), "Could not transform %s to %s: %s",
-        goal->dock_frame.c_str(), goal->robot_dock_frame.c_str(), ex.what());
-    rclcpp_action::GoalResponse response = rclcpp_action::GoalResponse::REJECT;
-    return response;
+    response = "Could not transform " + goal->dock_frame + " to " + goal->robot_dock_frame + ": " + ex.what();
+    return false;
   }
 
   RCLCPP_INFO(get_logger(), "Received charging goal to frame %s from %s", goal->dock_frame.c_str(), goal->robot_dock_frame.c_str());
@@ -165,16 +159,14 @@ rclcpp_action::GoalResponse RobotnikCharge::charge_handle_goal(const rclcpp_acti
   // Check Actions status
   if (!dock_action_client_->wait_for_action_server(std::chrono::seconds(10)))
   {
-    RCLCPP_ERROR(this->get_logger(), "Dock server not available after waiting");
-    rclcpp_action::GoalResponse response = rclcpp_action::GoalResponse::REJECT;
-    return response;
+    response = "Dock server not available after waiting";
+    return false;
   }
 
   if (!move_action_client_->wait_for_action_server(std::chrono::seconds(10)))
   {
-    RCLCPP_ERROR(this->get_logger(), "Move server not available after waiting");
-    rclcpp_action::GoalResponse response = rclcpp_action::GoalResponse::REJECT;
-    return response;
+    response = "Move server not available after waiting";
+    return false;
   }
 
   // TODO: Safety service
@@ -183,10 +175,29 @@ rclcpp_action::GoalResponse RobotnikCharge::charge_handle_goal(const rclcpp_acti
     RCLCPP_WARN(this->get_logger(), "Changing Lasers mode");
   }
 
-  RCLCPP_WARN(this->get_logger(), "Goal with uuid: %d Accepted", uuid[0]);
+  response = "Goal accepted";
+  return true;
+}
 
-  rclcpp_action::GoalResponse response = rclcpp_action::GoalResponse::ACCEPT_AND_EXECUTE;
-  charge_manager_state_ = RobotnikChargeState::Ready;
+// Charge Handle
+rclcpp_action::GoalResponse RobotnikCharge::charge_handle_goal(const rclcpp_action::GoalUUID &uuid,
+                                                        std::shared_ptr<const Charge::Goal> goal)
+{
+  RCLCPP_INFO(this->get_logger(), "Charge action received");
+
+  rclcpp_action::GoalResponse response;
+  std::string response_message;
+  if (!can_charge_be_accepted(goal, response_message))
+  {
+    RCLCPP_ERROR(this->get_logger(), "Charge action rejected: %s", response_message.c_str());
+    response = rclcpp_action::GoalResponse::REJECT;
+  }
+  else
+  {
+    RCLCPP_WARN(this->get_logger(), "Goal with uuid: %d Accepted", uuid[0]);
+    response = rclcpp_action::GoalResponse::ACCEPT_AND_EXECUTE;
+    charge_manager_state_ = RobotnikChargeState::Ready;
+  }
   return response;
 }
 
@@ -196,9 +207,6 @@ rclcpp_action::CancelResponse RobotnikCharge::charge_handle_cancel(const std::sh
   // Cancel actions
   dock_action_client_->async_cancel_all_goals();
   move_action_client_->async_cancel_all_goals();
-
-  //Change Laser Mode
-  set_dock_laser_mode(true);
 
   (void)goal_handle;
   // Change State
@@ -349,32 +357,29 @@ void RobotnikCharge::execute_charge(const std::shared_ptr<GoalHandleCharge> goal
 
 }
 
-// Uncharge Handle
-rclcpp_action::GoalResponse RobotnikCharge::uncharge_handle_goal(const rclcpp_action::GoalUUID &uuid,
-  std::shared_ptr<const Uncharge::Goal> goal)
+bool RobotnikCharge::can_uncharge_be_accepted(std::shared_ptr<const Uncharge::Goal>goal, std::string& response)
 {
-  RCLCPP_INFO(this->get_logger(), "Uncharge action received");
-  (void)goal;
+  (void)goal; // Unused parameter, can be used in the future for more complex uncharge goals
 
+  // Check if the action server is in a valid state
   if(not (charge_manager_state_ == RobotnikChargeState::Init) and not (charge_manager_state_ == RobotnikChargeState::Finished))
   {
-    rclcpp_action::GoalResponse response = rclcpp_action::GoalResponse::REJECT;
-    RCLCPP_ERROR(this->get_logger(), "There is any other action working");
-    return response;
+    response = "There is another action running";
+    return false;
   }
 
+  // Check if the battery message is recent
   if ((this->get_clock()->now() - last_battery_msg_).seconds() > 5.0)
   {
-    rclcpp_action::GoalResponse response = rclcpp_action::GoalResponse::REJECT;
-    RCLCPP_ERROR(this->get_logger(), "Battery msg not updated in the last 5 second");
-    return response;
+    response = "Battery msg not updated in the last 5 second";
+    return false;
   }
 
+  // Check Actions status
   if (!move_action_client_->wait_for_action_server(std::chrono::seconds(10)))
   {
-    RCLCPP_ERROR(this->get_logger(), "Move server not available after waiting");
-    rclcpp_action::GoalResponse response = rclcpp_action::GoalResponse::REJECT;
-    return response;
+    response = "Move server not available after waiting";
+    return false;
   }
 
   // TODO: Safety service
@@ -383,10 +388,31 @@ rclcpp_action::GoalResponse RobotnikCharge::uncharge_handle_goal(const rclcpp_ac
     RCLCPP_WARN(this->get_logger(), "Changing Lasers mode");
   }
 
-  RCLCPP_WARN(this->get_logger(), "Goal with uuid: %d Accepted", uuid[0]);
+  response = "Goal accepted";
+  return true;
+}
 
-  rclcpp_action::GoalResponse response = rclcpp_action::GoalResponse::ACCEPT_AND_EXECUTE;
-  charge_manager_state_ = RobotnikChargeState::Ready;
+// Uncharge Handle
+rclcpp_action::GoalResponse RobotnikCharge::uncharge_handle_goal(const rclcpp_action::GoalUUID &uuid,
+  std::shared_ptr<const Uncharge::Goal> goal)
+{
+  RCLCPP_INFO(this->get_logger(), "Uncharge action received");
+  rclcpp_action::GoalResponse response;
+  std::string response_message;
+
+  // If everything is ok, accept the goal
+  if (!can_uncharge_be_accepted(goal, response_message))
+  {
+    RCLCPP_ERROR(this->get_logger(), "Uncharge action rejected: %s", response_message.c_str());
+    response = rclcpp_action::GoalResponse::REJECT;
+  }
+  else
+  {
+    RCLCPP_WARN(this->get_logger(), "Goal with uuid: %d Accepted", uuid[0]);
+    response = rclcpp_action::GoalResponse::ACCEPT_AND_EXECUTE;
+    charge_manager_state_ = RobotnikChargeState::Ready;
+  }
+
   return response;
 }
 
@@ -395,9 +421,6 @@ rclcpp_action::CancelResponse RobotnikCharge::uncharge_handle_cancel(const std::
 
   // Cancel actions
   move_action_client_->async_cancel_all_goals();
-
-  //Change Laser Mode
-  set_dock_laser_mode(false);
 
   (void)goal_handle;
   // Change State

@@ -72,12 +72,14 @@ public:
 
 private:
   //Charge
+  bool can_charge_be_accepted(std::shared_ptr<const Charge::Goal> goal, std::string & response);
   rclcpp_action::GoalResponse charge_handle_goal(const rclcpp_action::GoalUUID & uuid, std::shared_ptr<const Charge::Goal> goal);
   rclcpp_action::CancelResponse charge_handle_cancel(const std::shared_ptr<GoalHandleCharge> goal_handle);
   void charge_handle_accepted(const std::shared_ptr<GoalHandleCharge> goal_handle);
   void execute_charge(const std::shared_ptr<GoalHandleCharge> goal_handle);
 
   //Uncharge
+  bool can_uncharge_be_accepted(std::shared_ptr<const Uncharge::Goal> goal, std::string & response);
   rclcpp_action::GoalResponse uncharge_handle_goal(const rclcpp_action::GoalUUID & uuid, std::shared_ptr<const Uncharge::Goal> goal);
   rclcpp_action::CancelResponse uncharge_handle_cancel(const std::shared_ptr<GoalHandleUncharge> goal_handle);
   void uncharge_handle_accepted(const std::shared_ptr<GoalHandleUncharge> goal_handle);
