@@ -10,7 +10,7 @@ namespace robotnik_charge
 {
 
 /******* Atomic Actions *******/
-void RobotnikCharge::change_laser_mode(bool activate)
+void RobotnikCharge::set_dock_laser_mode(bool activate)
 {
   //Change Mode
   auto request = std::make_shared<robotnik_common_msgs::srv::SetString::Request>();
@@ -84,16 +84,9 @@ void RobotnikCharge::send_move_goal()
 
 }
 
-void RobotnikCharge::change_relay_mode(bool activate)
+void RobotnikCharge::set_charge_relay(bool activate)
 {
-  if(activate)
-  {
-    RCLCPP_INFO(this->get_logger(), "Charge relay mode to true");
-  }
-  else
-  {
-    RCLCPP_INFO(this->get_logger(), "Charge relay mode to false");
-  }
+  RCLCPP_INFO(this->get_logger(), "Charge relay set to %s", activate ? "true" : "false");
 
   auto request = std::make_shared<SetBool::Request>();
 

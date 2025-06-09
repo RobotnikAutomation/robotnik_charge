@@ -104,8 +104,8 @@ private:
   void send_move_goal();
   void send_move_backwards();
   void send_rotation();
-  void change_relay_mode(bool activate);
-  void change_laser_mode(bool activate);
+  void set_charge_relay(bool activate);
+  void set_dock_laser_mode(bool activate);
   void retry();
   void charge_abort();
   void uncharge_abort();
