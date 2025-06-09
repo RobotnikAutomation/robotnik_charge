@@ -250,79 +250,13 @@ void RobotnikCharge::uncharge_abort()
 
 std::string RobotnikCharge::state_to_text(RobotnikChargeState state)
 {
-  switch (state)
-    {
-    case RobotnikChargeState::Init:
-      return "Init";
-      break;
+  // Convert RobotnikChargeState to string for feedback
+  // This is used to provide feedback to the user about the current state of the charge process
+  // and to log the state in the console.
 
-    case RobotnikChargeState::Ready:
-      return "Ready";
-      break;
+  std::string text_state = magic_enum::enum_contains<RobotnikChargeState>(state) ?
+    static_cast<std::string>(magic_enum::enum_name(state)) : "Invalid State"; 
 
-    case RobotnikChargeState::DeactivatingLasers:
-      return "DeactivatingLasers";
-      break;
-
-    case RobotnikChargeState::InitDocking:
-      return "InitDocking";
-      break;
-
-    case RobotnikChargeState::Docking:
-      return "Docking";
-      break;
-
-    case RobotnikChargeState::EndDocking:
-      return "EndDocking";
-      break;
-
-    case RobotnikChargeState::InitMoving:
-      return "InitMoving";
-      break;
-
-    case RobotnikChargeState::Moving:
-      return "Moving";
-      break;
-
-    case RobotnikChargeState::EndMoving:
-      return "EndMoving";
-      break;
-
-    case RobotnikChargeState::ActivateRelay:
-      return "ActivateRelay";
-      break;
-
-    case RobotnikChargeState::WaitCharging:
-      return "WaitCharging";
-      break;
-
-    case RobotnikChargeState::Charging:
-      return "Charging";
-      break;
-
-    case RobotnikChargeState::Cancelled:
-      return "Cancelled";
-      break;
-
-    case RobotnikChargeState::Aborted:
-      return "Aborted";
-      break;
-
-    case RobotnikChargeState::Retry:
-      return "Retry";
-      break;
-
-    case RobotnikChargeState::MovingBackwards:
-      return "MovingBackwards";
-      break;
-
-      case RobotnikChargeState::Finished:
-      return "Finished";
-      break;
-
-      default:
-      return "Invalid State";
-      break;
-  }
+  return text_state;
 }
 }

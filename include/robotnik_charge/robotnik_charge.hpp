@@ -23,6 +23,8 @@
 #include "tf2_ros/transform_listener.h"
 #include "tf2_ros/buffer.h"
 
+#include "robotnik_charge/magic_enum.hpp"
+
 namespace robotnik_charge
 {
 enum RobotnikChargeState
