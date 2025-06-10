@@ -24,6 +24,7 @@
 #include "tf2_ros/buffer.h"
 
 #include "robotnik_charge/magic_enum.hpp"
+#include "robotnik_charge/custom_timer.hpp"
 
 namespace robotnik_charge
 {
@@ -71,6 +72,50 @@ public:
   explicit RobotnikCharge();
 
 private:
+  template <typename T>
+  bool service_client_handler(std::shared_ptr<rclcpp::Client<T>> client,
+                              std::shared_ptr<typename T::Request> request,
+                              typename T::Response & response)
+  {
+    const char* service_name = client->get_service_name();
+    if (!client->wait_for_service(std::chrono::seconds(1)))
+    {
+      if (!rclcpp::ok())
+      {
+        RCLCPP_ERROR(this->get_logger(), "Interrupted while waiting for the service %s. Exiting.", service_name);
+      }
+      else
+      {
+        RCLCPP_ERROR(this->get_logger(), "Service %s not available", service_name);
+      }
+      return false;
+    }
+
+    auto future = client->async_send_request(request);
+    if (rclcpp::spin_until_future_complete(this->get_node_base_interface(), future, std::chrono::seconds(1)) !=
+        rclcpp::FutureReturnCode::SUCCESS)
+    {
+      // If the future did not complete successfully, log an error
+      RCLCPP_ERROR(this->get_logger(), "Failed to call service %s", service_name);
+      client->remove_pending_request(future);
+      return false;
+    }
+
+    // Handle response
+    auto response_future = future.get();
+    if (!response_future)
+    {
+      // If the response is null, log an error
+      RCLCPP_ERROR(this->get_logger(), "Service %s returned null response", service_name);
+      return false;
+    }
+    else
+    {
+      response = *response_future;
+      return true;
+    }
+  }
+
   //Charge
   bool can_charge_be_accepted(std::shared_ptr<const Charge::Goal> goal, std::string & response);
   rclcpp_action::GoalResponse charge_handle_goal(const rclcpp_action::GoalUUID & uuid, std::shared_ptr<const Charge::Goal> goal);
@@ -96,6 +141,19 @@ private:
 
   void battery_status_callback(const BatteryStatus::SharedPtr msg);
 
+  template <typename T>
+  void action_feedback_callback(const typename rclcpp_action::ClientGoalHandle<T>::SharedPtr &goal_handle,
+                                const std::shared_ptr<const typename T::Feedback> feedback,
+                                const char* action_name);
+
+  template <typename T>
+  void action_goal_callback(const typename rclcpp_action::ClientGoalHandle<T>::SharedPtr &goal_handle,
+                            const char* action_name);
+
+  template <typename T>
+  void action_result_callback(const typename rclcpp_action::ClientGoalHandle<T>::WrappedResult &result,
+                              bool& finished, const char* action_name);
+
   // Atomic Actions
   void send_charge_feedback();
   void send_charge_result(bool success);
@@ -106,8 +164,8 @@ private:
   void send_move_goal();
   void send_move_backwards();
   void send_rotation();
-  void set_charge_relay(bool activate);
-  void set_dock_laser_mode(bool activate);
+  bool set_charge_relay(bool activate);
+  bool set_dock_laser_mode(bool activate);
   void retry();
   void charge_abort();
   void uncharge_abort();
@@ -160,5 +218,8 @@ private:
 };
 
 }
+
+#include "robotnik_charge/action_clients.hpp"
+
 
 #endif  // _ROBOTNIK_CHARGE_

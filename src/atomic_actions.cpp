@@ -10,12 +10,12 @@ namespace robotnik_charge
 {
 
 /******* Atomic Actions *******/
-void RobotnikCharge::set_dock_laser_mode(bool activate)
+bool RobotnikCharge::set_dock_laser_mode(bool activate)
 {
   if (!params_.has_safety_lasers)
   {
     RCLCPP_WARN(this->get_logger(), "Safety lasers are not enabled, skipping laser mode change.");
-    return;
+    return true;
   }
 
   //Change Mode
@@ -23,20 +23,21 @@ void RobotnikCharge::set_dock_laser_mode(bool activate)
   request->data = activate ? params_.laser_mode_during_action : params_.laser_mode_after_action;
 
   RCLCPP_INFO(this->get_logger(), "Changing laser mode to %s", request->data.c_str());
-  while (!set_laser_mode_->wait_for_service(1s))
+
+  robotnik_common_msgs::srv::SetString::Response response_msg;
+  response_msg.response.success = false;
+  bool success = service_client_handler(set_laser_mode_, request, response_msg);
+  if (success && response_msg.response.success)
   {
-    if (!rclcpp::ok())
-    {
-      RCLCPP_ERROR(this->get_logger(), "Interrupted while waiting for the service %s. Exiting.", set_laser_mode_->get_service_name());
-      charge_manager_state_ = RobotnikChargeState::Aborted;
-      return;
-    }
-    RCLCPP_INFO(this->get_logger(), "%s not available, waiting again...", set_laser_mode_->get_service_name());
+    RCLCPP_INFO(this->get_logger(), "Laser mode changed successfully to %s", request->data.c_str());
+  }
+  else
+  {
+    RCLCPP_ERROR(this->get_logger(), "Failed to change laser mode to %s: %s",
+      request->data.c_str(), response_msg.response.message.c_str());
   }
 
-  set_laser_mode_->async_send_request(request);
-
-  RCLCPP_INFO(this->get_logger(), "Laser mode changed to %s", request->data.c_str());
+  return success && response_msg.response.success;
 }
 
 void RobotnikCharge::send_dock_goal()
@@ -90,27 +91,26 @@ void RobotnikCharge::send_move_goal()
 
 }
 
-void RobotnikCharge::set_charge_relay(bool activate)
+bool RobotnikCharge::set_charge_relay(bool activate)
 {
   RCLCPP_INFO(this->get_logger(), "Charge relay set to %s", activate ? "true" : "false");
 
   auto request = std::make_shared<SetBool::Request>();
 
   request->data = activate;
-
-  while (!set_charger_relay_->wait_for_service(1s))
+  SetBool::Response response_msg;
+  response_msg.success = false;
+  bool success = service_client_handler(set_charger_relay_, request, response_msg);
+  if (success && response_msg.success)
   {
-    if (!rclcpp::ok())
-    {
-      RCLCPP_ERROR(this->get_logger(), "Interrupted while waiting for the service charge_manager/set_charger_relay. Exiting.");
-      charge_manager_state_ = RobotnikChargeState::Aborted;
-      return;
-    }
-    RCLCPP_INFO(this->get_logger(), "charge_manager/set_charger_relay not available, waiting again...");
+    RCLCPP_INFO(this->get_logger(), "Charge relay set successfully to %s", request->data ? "true" : "false");
+  }
+  else
+  {
+    RCLCPP_ERROR(this->get_logger(), "Failed to set charge relay: %s", response_msg.message.c_str());
   }
 
-  set_charger_relay_->async_send_request(request);
-
+  return success && response_msg.success;
 }
 
 void RobotnikCharge::wait_charging()
