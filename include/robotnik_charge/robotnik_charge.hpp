@@ -130,15 +130,7 @@ private:
   void uncharge_handle_accepted(const std::shared_ptr<GoalHandleUncharge> goal_handle);
   void execute_uncharge(const std::shared_ptr<GoalHandleUncharge> goal_handle);
 
-  // Callback
-  void dock_goal_callback(const GoalHandleDock::SharedPtr & goal_handle);
-  void dock_feedback_callback(const GoalHandleDock::SharedPtr & goal_handle, const std::shared_ptr<const Dock::Feedback> feedback);
-  void dock_result_callback(const GoalHandleDock::WrappedResult & result);
-
-  void move_goal_callback(const GoalHandleMove::SharedPtr & goal_handle);
-  void move_feedback_callback(const GoalHandleMove::SharedPtr & goal_handle, const std::shared_ptr<const Move::Feedback> feedback);
-  void move_result_callback(const GoalHandleMove::WrappedResult & result);
-
+  // Callbacks
   void battery_status_callback(const BatteryStatus::SharedPtr msg);
 
   template <typename T>
