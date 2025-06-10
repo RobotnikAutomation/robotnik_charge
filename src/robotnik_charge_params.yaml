@@ -69,8 +69,7 @@ robotnik_charge:
     default_value: 0.0
     description: "Rotation to apply after uncharge step back. default: 0.0"
     validation:
-      gt_eq<>: -3.14
-      lt_eq<>: 3.14
+      bounds<>: [-3.14,3.14]
 
   max_velocity_x:
     type: double
