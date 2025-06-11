@@ -72,49 +72,6 @@ public:
   explicit RobotnikCharge();
 
 private:
-  template <typename T>
-  bool service_client_handler(std::shared_ptr<rclcpp::Client<T>> client,
-                              std::shared_ptr<typename T::Request> request,
-                              typename T::Response & response)
-  {
-    const char* service_name = client->get_service_name();
-    if (!client->wait_for_service(std::chrono::seconds(1)))
-    {
-      if (!rclcpp::ok())
-      {
-        RCLCPP_ERROR(this->get_logger(), "Interrupted while waiting for the service %s. Exiting.", service_name);
-      }
-      else
-      {
-        RCLCPP_ERROR(this->get_logger(), "Service %s not available", service_name);
-      }
-      return false;
-    }
-
-    auto future = client->async_send_request(request);
-    if (rclcpp::spin_until_future_complete(this->get_node_base_interface(), future, std::chrono::seconds(1)) !=
-        rclcpp::FutureReturnCode::SUCCESS)
-    {
-      // If the future did not complete successfully, log an error
-      RCLCPP_ERROR(this->get_logger(), "Failed to call service %s", service_name);
-      client->remove_pending_request(future);
-      return false;
-    }
-
-    // Handle response
-    auto response_future = future.get();
-    if (!response_future)
-    {
-      // If the response is null, log an error
-      RCLCPP_ERROR(this->get_logger(), "Service %s returned null response", service_name);
-      return false;
-    }
-    else
-    {
-      response = *response_future;
-      return true;
-    }
-  }
 
   //Charge
   bool can_charge_be_accepted(std::shared_ptr<const Charge::Goal> goal, std::string & response);
@@ -145,6 +102,18 @@ private:
   template <typename T>
   void action_result_callback(const typename rclcpp_action::ClientGoalHandle<T>::WrappedResult &result,
                               bool& finished, const char* action_name);
+
+  template <typename T>
+  std::shared_ptr<bool> service_client_handler(std::shared_ptr<rclcpp::Client<T>> client,
+                            std::shared_ptr<typename T::Request> request,
+                            std::shared_ptr<typename T::Response> response);
+
+  template <typename T>
+  bool service_call_callback(const typename rclcpp::Client<T>::SharedFuture future,
+                          std::shared_ptr<typename T::Response> response);
+
+  template <typename T>
+  void remove_pending_requests(std::shared_ptr<rclcpp::Client<T>> client);
 
   // Atomic Actions
   void send_charge_feedback();
@@ -212,6 +181,7 @@ private:
 }
 
 #include "robotnik_charge/action_clients.hpp"
+#include "robotnik_charge/service_clients.hpp"
 
 
 #endif  // _ROBOTNIK_CHARGE_

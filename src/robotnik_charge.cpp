@@ -267,6 +267,10 @@ void RobotnikCharge::execute_charge(const std::shared_ptr<GoalHandleCharge> goal
         charge_manager_state_ = RobotnikChargeState::InitDocking;
         step_timer.reset();
       }
+      else if (step_timer.is_timedout())
+      {
+        remove_pending_requests(set_laser_mode_);
+      }
       break;
 
     case RobotnikChargeState::InitDocking:
@@ -315,6 +319,10 @@ void RobotnikCharge::execute_charge(const std::shared_ptr<GoalHandleCharge> goal
       {
         charge_manager_state_ = RobotnikChargeState::WaitCharging;
         step_timer.reset();
+      }
+      else if (step_timer.is_timedout())
+      {
+        remove_pending_requests(set_charger_relay_);
       }
       break;
 
@@ -493,6 +501,10 @@ void RobotnikCharge::execute_uncharge(const std::shared_ptr<GoalHandleUncharge> 
         charge_manager_state_ = RobotnikChargeState::DeactivatingLasers;
         step_timer.reset();
       }
+      else if (step_timer.is_timedout())
+      {
+        remove_pending_requests(set_charger_relay_);
+      }
       break;
 
     case RobotnikChargeState::DeactivatingLasers:
@@ -500,6 +512,10 @@ void RobotnikCharge::execute_uncharge(const std::shared_ptr<GoalHandleUncharge> 
       {
         charge_manager_state_ = RobotnikChargeState::InitMoving;
         step_timer.reset();
+      }
+      else if (step_timer.is_timedout())
+      {
+        remove_pending_requests(set_laser_mode_);
       }
       break;
 
@@ -532,11 +548,17 @@ void RobotnikCharge::execute_uncharge(const std::shared_ptr<GoalHandleUncharge> 
       break;
 
     case RobotnikChargeState::ActivatingLasers:
-      set_dock_laser_mode(false);
-      charge_manager_state_ = RobotnikChargeState::Finished;
-      step_timer.reset();
-      send_uncharge_result(true);
-      return;
+      if (set_dock_laser_mode(false))
+      {
+        charge_manager_state_ = RobotnikChargeState::Finished;
+        step_timer.reset();
+        send_uncharge_result(true);
+        return;
+      }
+      else if (step_timer.is_timedout())
+      {
+        remove_pending_requests(set_laser_mode_);
+      }
       break;
 
     case RobotnikChargeState::Cancelled:
