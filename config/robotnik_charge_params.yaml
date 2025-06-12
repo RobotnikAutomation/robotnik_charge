@@ -3,7 +3,7 @@ robot:
     ros__parameters:
 
       rate: 10
-      charge_action_timeout: 60.0
+      step_timeout: 30.0
       timeout_charging_detection: 5
       dock_action: "accurate_smooth_dock/dock"
       move_action: "move"

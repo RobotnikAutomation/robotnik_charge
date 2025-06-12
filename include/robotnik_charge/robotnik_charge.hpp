@@ -134,6 +134,7 @@ private:
   void uncharge_abort();
 
   std::string state_to_text(RobotnikChargeState state);
+  void switch_to_state(RobotnikChargeState new_state, std::shared_ptr<Timer> timer = nullptr);
 
   // Params
   rclcpp::TimerBase::SharedPtr params_timer_;

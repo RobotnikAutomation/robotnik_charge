@@ -16,6 +16,12 @@ public:
     {
     }
 
+    void start()
+    {
+        global_init_time_ = std::chrono::steady_clock::now();
+        init_time_ = global_init_time_;
+    }
+
     bool is_timedout() const
     {
         return std::chrono::steady_clock::now() - init_time_ >= std::chrono::duration<double>(duration_);
