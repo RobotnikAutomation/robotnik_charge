@@ -17,7 +17,7 @@ public:
     }
 
     bool is_timedout() const
-    {   
+    {
         return std::chrono::steady_clock::now() - init_time_ >= std::chrono::duration<double>(duration_);
     }
 
@@ -26,9 +26,14 @@ public:
         init_time_ = std::chrono::steady_clock::now();
     }
 
-    double get_elapsed_time() const
+    double get_global_elapsed_time() const
     {
         return std::chrono::duration<double>(std::chrono::steady_clock::now() - global_init_time_).count();
+    }
+
+    double get_elapsed_time() const
+    {
+        return std::chrono::duration<double>(std::chrono::steady_clock::now() - init_time_).count();
     }
 
 private:
