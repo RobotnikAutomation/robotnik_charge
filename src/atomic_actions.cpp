@@ -18,33 +18,40 @@ bool RobotnikCharge::set_dock_laser_mode(bool activate)
     return true;
   }
 
+  static std::shared_ptr<bool> success = nullptr;
+  static auto request = std::make_shared<SetString::Request>();
+  static auto response = std::make_shared<SetString::Response>();
+  
   //Change Mode
-  auto request = std::make_shared<SetString::Request>();
-  request->data = activate ? params_.laser_mode_during_action : params_.laser_mode_after_action;
-
-  RCLCPP_INFO(this->get_logger(), "Changing laser mode to %s", request->data.c_str());
-
-  std::shared_ptr<SetString::Response> response_msg = std::make_shared<SetString::Response>();
-  response_msg->response.success = false;
-  std::shared_ptr<bool> success = service_client_handler(set_laser_mode_, request, response_msg);
+  if (!service_request_sent_)
+  {
+    request->data = activate ? params_.laser_mode_during_action : params_.laser_mode_after_action;
+    response->response.success = false;
+    service_client_handler(set_laser_mode_, request, response, success);
+    service_request_sent_ = true;
+  }
 
   if (!success) //success = nullptr;
   {
-    RCLCPP_ERROR(this->get_logger(), "No response for service call %s", set_laser_mode_->get_service_name());
     return false;
   }
 
-  if (*success && response_msg->response.success)
+  bool success_value = *success && response->response.success;
+  if (success_value)
   {
     RCLCPP_INFO(this->get_logger(), "Laser mode changed successfully to %s", request->data.c_str());
   }
   else
   {
     RCLCPP_ERROR(this->get_logger(), "Failed to change laser mode to %s: %s",
-      request->data.c_str(), response_msg->response.message.c_str());
+      request->data.c_str(), response->response.message.c_str());
   }
 
-  return *success && response_msg->response.success;
+  success = nullptr; //reset success
+  *request = SetString::Request(); //reset request
+  *response = SetString::Response(); //reset response
+  service_request_sent_ = false; //reset sent flag
+  return success_value;
 }
 
 void RobotnikCharge::send_dock_goal()
@@ -100,31 +107,46 @@ void RobotnikCharge::send_move_goal()
 
 bool RobotnikCharge::set_charge_relay(bool activate)
 {
-  RCLCPP_INFO(this->get_logger(), "Charge relay set to %s", activate ? "true" : "false");
+  if (docking_operation_mode_ != DockingStatus::_status_type::MODE_MANUAL_SW)
+  {
+    RCLCPP_WARN(this->get_logger(), "Docking mode is %s, skipping set charge relay step", docking_operation_mode_.c_str());
+    return true;
+  }
 
-  auto request = std::make_shared<SetBool::Request>();
-
-  request->data = activate;
-  std::shared_ptr<SetBool::Response> response_msg = std::make_shared<SetBool::Response>();
-  response_msg->success = false;
-  std::shared_ptr<bool> success = service_client_handler(set_charger_relay_, request, response_msg);
+  static std::shared_ptr<bool> success = nullptr;
+  static auto request = std::make_shared<SetBool::Request>();
+  static auto response = std::make_shared<SetBool::Response>();
+  
+  if (!service_request_sent_)
+  {
+    // RCLCPP_INFO(this->get_logger(), "Charge relay set to %s", activate ? "true" : "false");
+    request->data = activate;
+    response->success = false;
+    service_client_handler(set_charger_relay_, request, response, success);
+    service_request_sent_ = true;
+  }
 
   if (!success) // success = nullptr;
   {
-    RCLCPP_ERROR(this->get_logger(), "No response for service call %s", set_charger_relay_->get_service_name());
+    // RCLCPP_ERROR(this->get_logger(), "No response for service call %s", set_charger_relay_->get_service_name());
     return false;
   }
 
-  if (*success && response_msg->success)
+  bool success_value = *success && response->success;
+  if (success_value)
   {
     RCLCPP_INFO(this->get_logger(), "Charge relay set successfully to %s", request->data ? "true" : "false");
   }
   else
   {
-    RCLCPP_ERROR(this->get_logger(), "Failed to set charge relay: %s", response_msg->message.c_str());
+    RCLCPP_ERROR(this->get_logger(), "Failed to set charge relay: %s", response->message.c_str());
   }
 
-  return *success && response_msg->success;
+  success = nullptr; //reset success
+  *request = SetBool::Request(); //reset request
+  *response = SetBool::Response(); //reset response
+  service_request_sent_ = false; //reset sent flag
+  return success_value;
 }
 
 void RobotnikCharge::wait_charging()

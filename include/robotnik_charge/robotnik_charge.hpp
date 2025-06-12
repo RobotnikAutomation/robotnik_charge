@@ -7,6 +7,7 @@
 #include "rclcpp/rclcpp.hpp"
 #include "rclcpp_action/rclcpp_action.hpp"
 #include "robotnik_battery_msgs/msg/battery_status.hpp"
+#include "robotnik_battery_msgs/msg/docking_station_status_stamped.hpp"
 #include "robotnik_navigation_msgs/action/charge.hpp"
 #include "robotnik_navigation_msgs/action/uncharge.hpp"
 #include "robotnik_navigation_msgs/action/dock.hpp"
@@ -30,32 +31,31 @@ namespace robotnik_charge
 {
 enum RobotnikChargeState
 {
-  Init = 0,
-  Ready = 1,
-  DeactivatingLasers = 2,
-  ActivatingLasers = 3,
-  InitDocking = 4,
-  Docking = 5,
-  EndDocking = 6,
-  InitMoving = 7,
-  Moving = 8,
-  EndMoving = 9,
-  ActivateRelay = 10,
-  DeactivateRelay = 11,
-  WaitCharging = 12,
-  Charging = 13,
-  Cancelled = 14,
-  Aborted = 15,
-  Retry = 16,
-  MovingBackwards = 17,
-  InitRotating = 18,
-  Rotating = 19,
-  Finished = 20
+  Init,
+  Ready,
+  DeactivatingLasers,
+  ActivatingLasers,
+  InitDocking,
+  Docking,
+  InitMoving,
+  Moving,
+  ActivateRelay,
+  DeactivateRelay,
+  WaitCharging,
+  Charging,
+  Cancelled,
+  Aborted,
+  Retry,
+  MovingBackwards,
+  InitRotating,
+  Rotating,
+  Finished
 };
 class RobotnikCharge : public rclcpp::Node
 {
 public:
   using BatteryStatus = robotnik_battery_msgs::msg::BatteryStatus;
+  using DockingStatus = robotnik_battery_msgs::msg::DockingStationStatusStamped;
   using Charge = robotnik_navigation_msgs::action::Charge;
   using Uncharge = robotnik_navigation_msgs::action::Uncharge;
   using Dock = robotnik_navigation_msgs::action::Dock;
@@ -89,10 +89,11 @@ private:
 
   // Callbacks
   void battery_status_callback(const BatteryStatus::SharedPtr msg);
+  void docking_status_callback(const DockingStatus::SharedPtr msg);
 
   template <typename T>
   void action_feedback_callback(const typename rclcpp_action::ClientGoalHandle<T>::SharedPtr &goal_handle,
-                                const std::shared_ptr<const typename T::Feedback> feedback,
+                                const std::shared_ptr<const typename T::Feedback>& feedback,
                                 const char* action_name);
 
   template <typename T>
@@ -104,16 +105,17 @@ private:
                               bool& finished, const char* action_name);
 
   template <typename T>
-  std::shared_ptr<bool> service_client_handler(std::shared_ptr<rclcpp::Client<T>> client,
-                            std::shared_ptr<typename T::Request> request,
-                            std::shared_ptr<typename T::Response> response);
+  void service_client_handler(std::shared_ptr<rclcpp::Client<T>>& client,
+                            std::shared_ptr<typename T::Request>& request,
+                            std::shared_ptr<typename T::Response>& response,
+                            std::shared_ptr<bool>& success);
 
   template <typename T>
-  bool service_call_callback(const typename rclcpp::Client<T>::SharedFuture future,
-                          std::shared_ptr<typename T::Response> response);
+  bool service_call_callback(const typename rclcpp::Client<T>::SharedFuture& future,
+                          std::shared_ptr<typename T::Response>& response);
 
   template <typename T>
-  void remove_pending_requests(std::shared_ptr<rclcpp::Client<T>> client);
+  void remove_pending_requests(std::shared_ptr<rclcpp::Client<T>>& client);
 
   // Atomic Actions
   void send_charge_feedback();
@@ -141,6 +143,7 @@ private:
 
   // Interfaces
   rclcpp::Subscription<BatteryStatus>::SharedPtr battery_status_subscription_;
+  rclcpp::Subscription<DockingStatus>::SharedPtr docking_status_subscription_;
 
   rclcpp::Client<SetBool>::SharedPtr set_charger_relay_;
   rclcpp::Client<SetString>::SharedPtr set_laser_mode_;
@@ -159,11 +162,13 @@ private:
   rclcpp::Time init_charging_time_;
   bool is_charging_;
   Pose remaining_;
+  std::string docking_operation_mode_;
 
   geometry_msgs::msg::TransformStamped dock_frame_transform_;
 
   RobotnikChargeState charge_manager_state_;
   rclcpp::Time last_battery_msg_;
+  rclcpp::Time last_docking_status_msg_;
 
   std::shared_ptr<tf2_ros::TransformListener> tf_listener_{nullptr};
   std::unique_ptr<tf2_ros::Buffer> tf_buffer_;
@@ -176,6 +181,7 @@ private:
   bool dock_finished_;
   bool move_finished_;
 
+  bool service_request_sent_; 
 };
 
 }

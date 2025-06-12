@@ -1,10 +1,13 @@
 namespace robotnik_charge
 {
 template <typename T>
-std::shared_ptr<bool> RobotnikCharge::service_client_handler(std::shared_ptr<rclcpp::Client<T>> client,
-                            std::shared_ptr<typename T::Request> request,
-                            std::shared_ptr<typename T::Response> response)
+void RobotnikCharge::service_client_handler(std::shared_ptr<rclcpp::Client<T>>& client,
+                            std::shared_ptr<typename T::Request>& request,
+                            std::shared_ptr<typename T::Response>& response,
+                            std::shared_ptr<bool>& success)
 {
+    success = nullptr; // Init success variable. Only set if error calling service or a response has been received
+                        // This prevents success to have a value if it was set before and the service did not return a response yet
     const char* service_name = client->get_service_name();
     if (!client->wait_for_service(std::chrono::seconds(1)))
     {
@@ -16,30 +19,29 @@ std::shared_ptr<bool> RobotnikCharge::service_client_handler(std::shared_ptr<rcl
         {
             RCLCPP_ERROR(this->get_logger(), "Service %s not available", service_name);
         }
-        // Delete current request and response to avoid memory leaks
-        return std::make_shared<bool>(false);
+
+        success = std::make_shared<bool>(false);
+        return;
     }
 
-    std::shared_ptr<bool> success = nullptr;
-    auto future = client->async_send_request(request, [this, response, success, &service_name](const typename rclcpp::Client<T>::SharedFuture shared_future)
+    auto future = client->async_send_request(request, [this, &response, &success, service_name](const typename rclcpp::Client<T>::SharedFuture shared_future)
     {
-        *success = service_call_callback<T>(shared_future, response);
+        success = std::make_shared<bool>(service_call_callback<T>(shared_future, response));
+
         if (!(*success))
         {
-            RCLCPP_ERROR(this->get_logger(), "Service call failed for %s", service_name);
+            RCLCPP_ERROR(this->get_logger(), "Service %s call failed", service_name);
         }
         else
         {
-            RCLCPP_INFO(this->get_logger(), "Service call successful for %s", service_name);
+            RCLCPP_INFO(this->get_logger(), "Service %s called successfully", service_name);
         }
     });
-
-    return success;
 }
 
 template <typename T>
-bool RobotnikCharge::service_call_callback(const typename rclcpp::Client<T>::SharedFuture future,
-                          std::shared_ptr<typename T::Response> response)
+bool RobotnikCharge::service_call_callback(const typename rclcpp::Client<T>::SharedFuture& future,
+                          std::shared_ptr<typename T::Response>& response)
 {
     if (future.valid())
     {
@@ -63,8 +65,9 @@ bool RobotnikCharge::service_call_callback(const typename rclcpp::Client<T>::Sha
 }
 
 template <typename T>
-void RobotnikCharge::remove_pending_requests(std::shared_ptr<rclcpp::Client<T>> client)
+void RobotnikCharge::remove_pending_requests(std::shared_ptr<rclcpp::Client<T>>& client)
 {
+    service_request_sent_ = false;
     client->prune_pending_requests();
 }
 
