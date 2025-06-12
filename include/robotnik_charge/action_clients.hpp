@@ -5,7 +5,7 @@ namespace robotnik_charge
 {
 template <typename T>
 void RobotnikCharge::action_feedback_callback(const typename rclcpp_action::ClientGoalHandle<T>::SharedPtr &goal_handle,
-                              const std::shared_ptr<const typename T::Feedback> feedback,
+                              const std::shared_ptr<const typename T::Feedback>& feedback,
                               const char* action_name)
 {
   (void)feedback; // Unused parameter, can be used in the future for more complex feedback handling
