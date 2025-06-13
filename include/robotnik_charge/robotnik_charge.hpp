@@ -96,6 +96,7 @@ private:
   void battery_status_callback(const BatteryStatus::SharedPtr msg);
   void docking_status_callback(const DockingStatus::SharedPtr msg);
 
+  // Action callbacks
   template <typename T>
   void action_feedback_callback(const typename rclcpp_action::ClientGoalHandle<T>::SharedPtr &goal_handle,
                                 const std::shared_ptr<const typename T::Feedback>& feedback,
@@ -109,11 +110,12 @@ private:
   void action_result_callback(const typename rclcpp_action::ClientGoalHandle<T>::WrappedResult &result,
                               bool& finished, const char* action_name);
 
+  // Service clinets handlers and callback
   template <typename T>
-  void service_client_handler(std::shared_ptr<rclcpp::Client<T>>& client,
-                            std::shared_ptr<typename T::Request>& request,
-                            std::shared_ptr<typename T::Response>& response,
-                            std::shared_ptr<bool>& success);
+  void service_call(std::shared_ptr<rclcpp::Client<T>>& client,
+                    std::shared_ptr<typename T::Request>& request,
+                    std::shared_ptr<typename T::Response>& response,
+                    std::shared_ptr<bool>& callback_executed);
 
   template <typename T>
   bool service_call_callback(const typename rclcpp::Client<T>::SharedFuture& future,
@@ -187,6 +189,7 @@ private:
   bool dock_finished_;
   bool move_finished_;
 
+  std::shared_ptr<bool> service_callback_executed_;
   bool service_request_sent_;
   int64_t current_request_id_;
 };

@@ -1,44 +1,69 @@
 namespace robotnik_charge
 {
+
+/*! \brief
+Template function to handle service calls with a client and request/response objects.
+    * \tparam T The service type.
+    * \param client Shared pointer to the service client.
+    * \param request Shared pointer to the service request.
+    * \param response Shared pointer to the service response.
+    * \param callback_executed Shared pointer to a boolean that indicates if the callback has been executed.
+    * 
+    * This function sends a service request and waits for the response. It uses a callback
+    * to handle the response asynchronously and set callbak_executed.
+    * Is meant to be called serveral times in a loop until a response is received.
+    * response and callback_executed must live until the callback is executed.
+    * callback_executed will be set to true if the service call was successful, or false if it failed or the service is not available.
+    * callback_executed will be nullptr if the service was called and the callback was not executed yet.
+*/
 template <typename T>
-void RobotnikCharge::service_client_handler(std::shared_ptr<rclcpp::Client<T>>& client,
-                            std::shared_ptr<typename T::Request>& request,
-                            std::shared_ptr<typename T::Response>& response,
-                            std::shared_ptr<bool>& success)
+void RobotnikCharge::service_call(std::shared_ptr<rclcpp::Client<T>>& client,
+                                    std::shared_ptr<typename T::Request>& request,
+                                    std::shared_ptr<typename T::Response>& response,
+                                    std::shared_ptr<bool>& callback_executed)
 {
-    success = nullptr; // Init success variable. Only set if error calling service or a response has been received
-                        // This prevents success to have a value if it was set before and the service did not return a response yet
-    const char* service_name = client->get_service_name();
-    if (!client->wait_for_service(std::chrono::seconds(1)))
+    if (!service_request_sent_)
     {
-        if (!rclcpp::ok())
+        const char* service_name = client->get_service_name();
+        if (!client->wait_for_service(std::chrono::seconds(1)))
         {
-            RCLCPP_ERROR(this->get_logger(), "Interrupted while waiting for the service %s. Exiting.", service_name);
-        }
-        else
-        {
-            RCLCPP_ERROR(this->get_logger(), "Service %s not available", service_name);
+            if (!rclcpp::ok())
+            {
+                RCLCPP_ERROR(this->get_logger(), "Interrupted while waiting for the service %s. Exiting.", service_name);
+            }
+            else
+            {
+                RCLCPP_ERROR(this->get_logger(), "Service %s not available", service_name);
+            }
+
+            callback_executed = std::make_shared<bool>(false); // Return false if service is not available
+            return;
         }
 
-        success = std::make_shared<bool>(false);
-        return;
+        callback_executed = nullptr; // Init success variable. If service request was not sent yet, this should be null
+        // Service call and callback defined
+        auto future = client->async_send_request(request, [this, &response, &callback_executed, service_name](const typename rclcpp::Client<T>::SharedFuture shared_future)
+        {
+            callback_executed = std::make_shared<bool>(service_call_callback<T>(shared_future, response));
+
+            if (!(*callback_executed))
+            {
+                RCLCPP_ERROR(this->get_logger(), "Service %s call failed", service_name);
+            }
+            else
+            {
+                RCLCPP_INFO(this->get_logger(), "Service %s called successfully", service_name);
+            }
+        });
+
+        current_request_id_ = future.request_id;
+        service_request_sent_ = true;
     }
 
-    auto future = client->async_send_request(request, [this, &response, &success, service_name](const typename rclcpp::Client<T>::SharedFuture shared_future)
+    if (callback_executed) // success != nullptr; Callback executed
     {
-        success = std::make_shared<bool>(service_call_callback<T>(shared_future, response));
-
-        if (!(*success))
-        {
-            RCLCPP_ERROR(this->get_logger(), "Service %s call failed", service_name);
-        }
-        else
-        {
-            RCLCPP_INFO(this->get_logger(), "Service %s called successfully", service_name);
-        }
-    });
-
-    current_request_id_ = future.request_id;
+        service_request_sent_ = false; // Reset the request sent flag after callback has been executed
+    }
 }
 
 template <typename T>
