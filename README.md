@@ -91,11 +91,11 @@ These are the parameters:
     * read_only: true
     * description: "Frequency to run the action. default: 10"
 
-  * **charge_action_timeout**:
+  * **step_timeout**:
     * type: double
-    * default_value: 60.0
+    * default_value: 30.0
     * read_only: true
-    * description: "Seconds of timeout that the charging method must last. default: 60.0"
+    * description: "Seconds of timeout that each step of the charging or uncharging method must last. default: 30.0"
 
   * **dock_action**:
     * type: string
