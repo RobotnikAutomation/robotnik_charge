@@ -1,8 +1,5 @@
 #include "robotnik_charge/robotnik_charge.hpp"
 
-#include <robotnik_common_msgs/srv/set_string.hpp>
-#include <thread>
-
 using namespace std::chrono_literals;
 using namespace std::placeholders;
 
