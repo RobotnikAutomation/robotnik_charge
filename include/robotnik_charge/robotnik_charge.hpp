@@ -79,6 +79,7 @@ private:
   rclcpp_action::CancelResponse charge_handle_cancel(const std::shared_ptr<GoalHandleCharge> goal_handle);
   void charge_handle_accepted(const std::shared_ptr<GoalHandleCharge> goal_handle);
   void execute_charge(const std::shared_ptr<GoalHandleCharge> goal_handle);
+  void handle_charge_steps(std::shared_ptr<Timer>& timer);
 
   //Uncharge
   bool can_uncharge_be_accepted(std::shared_ptr<const Uncharge::Goal> goal, std::string & response);
@@ -86,6 +87,10 @@ private:
   rclcpp_action::CancelResponse uncharge_handle_cancel(const std::shared_ptr<GoalHandleUncharge> goal_handle);
   void uncharge_handle_accepted(const std::shared_ptr<GoalHandleUncharge> goal_handle);
   void execute_uncharge(const std::shared_ptr<GoalHandleUncharge> goal_handle);
+  void handle_uncharge_steps(std::shared_ptr<Timer>& timer);
+
+  // Charge and Uncharge
+  void handle_timeout_for_steps(std::shared_ptr<Timer>& timer);
 
   // Callbacks
   void battery_status_callback(const BatteryStatus::SharedPtr msg);
@@ -182,7 +187,8 @@ private:
   bool dock_finished_;
   bool move_finished_;
 
-  bool service_request_sent_; 
+  bool service_request_sent_;
+  int64_t current_request_id_;
 };
 
 }

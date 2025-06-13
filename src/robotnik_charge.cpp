@@ -117,6 +117,7 @@ RobotnikCharge::RobotnikCharge()
   dock_finished_ = false;
   move_finished_ = false;
   service_request_sent_ = false;
+  current_request_id_ = -1;
   docking_operation_mode_ = "";
   RCLCPP_INFO(get_logger(), "Robotnik Charge started");
   charge_manager_state_ = RobotnikChargeState::Init;
@@ -224,7 +225,7 @@ rclcpp_action::GoalResponse RobotnikCharge::charge_handle_goal(const rclcpp_acti
   {
     RCLCPP_WARN(this->get_logger(), "Goal with uuid: %d Accepted", uuid[0]);
     response = rclcpp_action::GoalResponse::ACCEPT_AND_EXECUTE;
-    charge_manager_state_ = RobotnikChargeState::Ready;
+    switch_to_state(RobotnikChargeState::Ready);
   }
   return response;
 }
@@ -238,7 +239,7 @@ rclcpp_action::CancelResponse RobotnikCharge::charge_handle_cancel(const std::sh
 
   (void)goal_handle; // Unused parameter, but required by the interface
   // Change State
-  charge_manager_state_ = RobotnikChargeState::Cancelled;
+  switch_to_state(RobotnikChargeState::Cancelled);
 
   RCLCPP_WARN(this->get_logger(), "Goal Cancelled");
   return rclcpp_action::CancelResponse::ACCEPT;
@@ -255,7 +256,6 @@ void RobotnikCharge::charge_handle_accepted(const std::shared_ptr<GoalHandleChar
 
 void RobotnikCharge::execute_charge(const std::shared_ptr<GoalHandleCharge> goal_handle)
 {
-
   // Goal Accepted
   RCLCPP_INFO(this->get_logger(), "GOAL ACCEPTED");
   rclcpp::Rate loop_rate(params_.rate);
@@ -264,137 +264,127 @@ void RobotnikCharge::execute_charge(const std::shared_ptr<GoalHandleCharge> goal
   current_charge_handle_ = goal_handle;
   current_goal_ = *goal_handle->get_goal();
   try_number_ = 0;
-  charge_manager_state_ = RobotnikChargeState::DeactivatingLasers;
-  auto step_timer = std::make_shared<Timer>(params_.charge_action_timeout);
+  switch_to_state(RobotnikChargeState::DeactivatingLasers);
+  auto step_timer = std::make_shared<Timer>(params_.step_timeout);
   auto charging_timer = std::make_shared<Timer>(params_.timeout_charging_detection);
 
   while(rclcpp::ok() && try_number_ <= current_goal_.retries)
   {
-    bool timer_timedout = step_timer->is_timedout();
-    switch (charge_manager_state_)
+
+    if(is_charging_)
     {
+      switch_to_state(RobotnikChargeState::Charging, step_timer);
+    }
+
+    if (step_timer->is_timedout())
+    {
+      handle_timeout_for_steps(step_timer);
+    }
+    else
+    {
+      handle_charge_steps(step_timer);
+    }
+
+    if (charge_manager_state_ == RobotnikChargeState::Finished)
+    {
+      return;
+    }
+
+    send_charge_feedback();
+    loop_rate.sleep();
+  }
+
+  send_charge_result(false);
+  switch_to_state(RobotnikChargeState::Finished);
+}
+
+void RobotnikCharge::handle_charge_steps(std::shared_ptr<Timer>& timer)
+{
+  switch (charge_manager_state_)
+  {
     case RobotnikChargeState::DeactivatingLasers:
       if (set_dock_laser_mode(true))
       {
-        switch_to_state(RobotnikChargeState::InitDocking, step_timer);
-      }
-      else if (timer_timedout)
-      {
-        remove_pending_requests(set_laser_mode_);
+        switch_to_state(RobotnikChargeState::InitDocking, timer);
       }
       break;
 
     case RobotnikChargeState::InitDocking:
-      timer_timedout = timer_timedout;
       send_dock_goal();
-      switch_to_state(RobotnikChargeState::Docking, step_timer);
+      switch_to_state(RobotnikChargeState::Docking, timer);
       break;
 
     case RobotnikChargeState::Docking:
       if(dock_finished_)
       {
-        switch_to_state(RobotnikChargeState::InitMoving, step_timer)
+        switch_to_state(RobotnikChargeState::InitMoving, timer);
       }
       break;
 
     case RobotnikChargeState::InitMoving:
       send_move_goal();
-      switch_to_state(RobotnikChargeState::Moving, step_timer);
+      switch_to_state(RobotnikChargeState::Moving, timer);
       break;
 
     case RobotnikChargeState::Moving:
       if (move_finished_)
       {
-        switch_to_state(RobotnikChargeState::ActivateRelay, step_timer);
-      }
-      else if (timer_timedout)
-      {
-        switch_to_state(RobotnikChargeState::Retry, step_timer);
-        timer_timedout = step_timer->is_timedout();
+        switch_to_state(RobotnikChargeState::ActivateRelay, timer);
       }
       break;
 
     case RobotnikChargeState::ActivateRelay:
       if (set_charge_relay(true))
       {
-        switch_to_state(RobotnikChargeState::WaitCharging, step_timer);
-        charging_timer->start();
-      }
-      else if (timer_timedout)
-      {
-        remove_pending_requests(set_charger_relay_);
-        switch_to_state(RobotnikChargeState::Retry, step_timer);
-        timer_timedout = step_timer->is_timedout();
+        switch_to_state(RobotnikChargeState::WaitCharging, timer);
+        init_charging_time_ = this->get_clock()->now();
       }
       break;
 
     case RobotnikChargeState::WaitCharging:
       if(is_charging_)
       {
-        switch_to_state(RobotnikChargeState::Charging, step_timer);
+        switch_to_state(RobotnikChargeState::Charging, timer);
       }
-      else if (charging_timer->is_timedout())
+      else if ((this->get_clock()->now() - init_charging_time_).seconds() > params_.timeout_charging_detection)
       {
-        switch_to_state(RobotnikChargeState::Retry, step_timer);
-        timer_timedout = step_timer->is_timedout();
+        RCLCPP_WARN(this->get_logger(), "Charging timeout, retrying...");
+        switch_to_state(RobotnikChargeState::Retry, timer);
       }
       break;
 
     case RobotnikChargeState::Charging:
-      switch_to_state(RobotnikChargeState::Finished, step_timer);
+      switch_to_state(RobotnikChargeState::Finished, timer);
       send_charge_result(true);
-      return;
       break;
 
     case RobotnikChargeState::Retry:
       retry();
-      switch_to_state(RobotnikChargeState::MovingBackwards, step_timer);
+      switch_to_state(RobotnikChargeState::MovingBackwards, timer);
       break;
 
     case RobotnikChargeState::MovingBackwards:
       if(move_finished_)
       {
         try_number_++;
-        switch_to_state(RobotnikChargeState::InitDocking, step_timer);
+        switch_to_state(RobotnikChargeState::InitDocking, timer);
       }
       break;
 
     case RobotnikChargeState::Cancelled:
-      switch_to_state(RobotnikChargeState::Finished, step_timer);
+      switch_to_state(RobotnikChargeState::Finished, timer);
       send_charge_feedback();
-      return;
       break;
 
     case RobotnikChargeState::Aborted:
       charge_abort();
-      switch_to_state(RobotnikChargeState::Finished, step_timer);
+      switch_to_state(RobotnikChargeState::Finished, timer);
       send_charge_feedback();
-      return;
       break;
 
     default:
       break;
-    }
-
-    if(is_charging_)
-    {
-      RCLCPP_INFO(this->get_logger(), "Charging detected while action");
-      switch_to_state(RobotnikChargeState::Charging);
-    }
-    else if (timer_timedout)
-    {
-      RCLCPP_ERROR(this->get_logger(), "Charging step timeout, ABORT! (Current step time: %f - Current action time: %f)",
-                                step_timer->get_elapsed_time(), step_timer->get_global_elapsed_time());
-      switch_to_state(RobotnikChargeState::Aborted);
-    }
-
-    send_charge_feedback();
-    loop_rate.sleep();
-
   }
-
-  send_charge_result(false);
-  switch_to_state(RobotnikChargeState::Finished);
 }
 
 void RobotnikCharge::switch_to_state(RobotnikChargeState new_state, std::shared_ptr<Timer> timer)
@@ -459,7 +449,7 @@ rclcpp_action::GoalResponse RobotnikCharge::uncharge_handle_goal(const rclcpp_ac
   {
     RCLCPP_WARN(this->get_logger(), "Goal with uuid: %d Accepted", uuid[0]);
     response = rclcpp_action::GoalResponse::ACCEPT_AND_EXECUTE;
-    charge_manager_state_ = RobotnikChargeState::Ready;
+    switch_to_state(RobotnikChargeState::Ready);
   }
 
   return response;
@@ -472,7 +462,7 @@ rclcpp_action::CancelResponse RobotnikCharge::uncharge_handle_cancel(const std::
 
   (void)goal_handle; // Unused parameter, but required by the interface
   // Change State
-  charge_manager_state_ = RobotnikChargeState::Cancelled;
+  switch_to_state(RobotnikChargeState::Cancelled);
 
   RCLCPP_WARN(this->get_logger(), "Goal Cancelled");
   return rclcpp_action::CancelResponse::ACCEPT;
@@ -496,49 +486,60 @@ void RobotnikCharge::execute_uncharge(const std::shared_ptr<GoalHandleUncharge> 
 
   current_uncharge_handle_ = goal_handle;
 
-  charge_manager_state_ = RobotnikChargeState::DeactivateRelay;
-  Timer step_timer(params_.charge_action_timeout);
+  switch_to_state(RobotnikChargeState::DeactivateRelay);
+  auto step_timer = std::make_shared<Timer>(params_.step_timeout);
 
   while(rclcpp::ok())
   {
-
-    switch (charge_manager_state_)
+    if (step_timer->is_timedout())
     {
+      handle_timeout_for_steps(step_timer);
+    }
+    else
+    {
+      handle_uncharge_steps(step_timer);
+    }
+
+    if (charge_manager_state_ == RobotnikChargeState::Finished)
+    {
+      return;
+    }
+
+    send_uncharge_feedback();
+    loop_rate.sleep();
+  }
+
+  send_uncharge_result(false);
+  switch_to_state(RobotnikChargeState::Finished);
+}
+
+void RobotnikCharge::handle_uncharge_steps(std::shared_ptr<Timer>& timer)
+{
+  switch (charge_manager_state_)
+  {
     case RobotnikChargeState::DeactivateRelay:
       if (set_charge_relay(false))
       {
-        charge_manager_state_ = RobotnikChargeState::DeactivatingLasers;
-        step_timer.reset();
-      }
-      else if (step_timer.is_timedout())
-      {
-        remove_pending_requests(set_charger_relay_);
+        switch_to_state(RobotnikChargeState::DeactivatingLasers, timer);
       }
       break;
 
     case RobotnikChargeState::DeactivatingLasers:
       if (set_dock_laser_mode(true))
       {
-        charge_manager_state_ = RobotnikChargeState::InitMoving;
-        step_timer.reset();
-      }
-      else if (step_timer.is_timedout())
-      {
-        remove_pending_requests(set_laser_mode_);
+        switch_to_state(RobotnikChargeState::InitMoving, timer);
       }
       break;
 
     case RobotnikChargeState::InitMoving:
       send_move_backwards();
-      charge_manager_state_ = RobotnikChargeState::MovingBackwards;
-      step_timer.reset();
+      switch_to_state(RobotnikChargeState::MovingBackwards, timer);
       break;
 
     case RobotnikChargeState::MovingBackwards:
       if(move_finished_)
       {
-        charge_manager_state_ = RobotnikChargeState::InitRotating;
-        step_timer.reset();
+        switch_to_state(RobotnikChargeState::InitRotating, timer);
       }
       break;
 
@@ -546,71 +547,83 @@ void RobotnikCharge::execute_uncharge(const std::shared_ptr<GoalHandleUncharge> 
       if (params_.rotation != 0.0)
       {
         send_rotation();
-        charge_manager_state_ = RobotnikChargeState::Rotating;
+        switch_to_state(RobotnikChargeState::Rotating, timer);
       }
       else
       {
         RCLCPP_WARN(this->get_logger(), "Rotation is %.2f rad, skipping this step.", params_.rotation);
-        charge_manager_state_ = RobotnikChargeState::ActivatingLasers;
+        switch_to_state(RobotnikChargeState::ActivatingLasers, timer);
       }
-      step_timer.reset();
       break;
 
     case RobotnikChargeState::Rotating:
       if(move_finished_)
       {
-        charge_manager_state_ = RobotnikChargeState::ActivatingLasers;
-        step_timer.reset();
+        switch_to_state(RobotnikChargeState::ActivatingLasers, timer);
       }
       break;
 
     case RobotnikChargeState::ActivatingLasers:
       if (set_dock_laser_mode(false))
       {
-        charge_manager_state_ = RobotnikChargeState::Finished;
-        step_timer.reset();
+        switch_to_state(RobotnikChargeState::Finished, timer);
         send_uncharge_result(true);
-        return;
-      }
-      else if (step_timer.is_timedout())
-      {
-        remove_pending_requests(set_laser_mode_);
       }
       break;
 
     case RobotnikChargeState::Cancelled:
-      charge_manager_state_ = RobotnikChargeState::Finished;
+      switch_to_state(RobotnikChargeState::Finished, timer);
       send_uncharge_feedback();
-      step_timer.reset();
-      return;
       break;
 
     case RobotnikChargeState::Aborted:
       uncharge_abort();
-      charge_manager_state_ = RobotnikChargeState::Finished;
-      step_timer.reset();
+      switch_to_state(RobotnikChargeState::Finished, timer);
       send_uncharge_feedback();
-      return;
       break;
 
     default:
       break;
-    }
-
-    if (step_timer.is_timedout())
-    {
-      RCLCPP_ERROR(this->get_logger(), "Uncharge step timeout, ABORT! (Current action time: %f)", step_timer.get_elapsed_time());
-      charge_manager_state_ = RobotnikChargeState::Aborted;
-    }
-
-    send_uncharge_feedback();
-    loop_rate.sleep();
-
   }
+}
 
-  send_uncharge_result(false);
-  charge_manager_state_ = RobotnikChargeState::Finished;
+void RobotnikCharge::handle_timeout_for_steps(std::shared_ptr<Timer>& timer)
+{
+  // Handle timeout for the current state
+  switch (charge_manager_state_)
+  {
+    case RobotnikChargeState::DeactivateRelay:
+      remove_pending_requests(set_charger_relay_);
+      switch_to_state(RobotnikChargeState::Aborted, timer);
+      break;
 
+    case RobotnikChargeState::DeactivatingLasers:
+      remove_pending_requests(set_laser_mode_);
+      switch_to_state(RobotnikChargeState::Aborted, timer);
+      break;
+
+    case RobotnikChargeState::ActivatingLasers:
+      remove_pending_requests(set_laser_mode_);
+      switch_to_state(RobotnikChargeState::Aborted, timer);
+      break;
+
+    case RobotnikChargeState::Moving:
+      switch_to_state(RobotnikChargeState::Retry, timer);
+      break;
+
+    case RobotnikChargeState::ActivateRelay:
+      remove_pending_requests(set_charger_relay_);
+      switch_to_state(RobotnikChargeState::Retry, timer);
+      break;
+
+    case RobotnikChargeState::WaitCharging:
+      switch_to_state(RobotnikChargeState::Retry, timer);
+      break;
+
+    default:
+      switch_to_state(RobotnikChargeState::Aborted, timer);
+      break;
+  }
 }
 
 /******* Callbacks ********/

@@ -37,6 +37,8 @@ void RobotnikCharge::service_client_handler(std::shared_ptr<rclcpp::Client<T>>& 
             RCLCPP_INFO(this->get_logger(), "Service %s called successfully", service_name);
         }
     });
+
+    current_request_id_ = future.request_id;
 }
 
 template <typename T>
@@ -68,8 +70,11 @@ template <typename T>
 void RobotnikCharge::remove_pending_requests(std::shared_ptr<rclcpp::Client<T>>& client)
 {
     service_request_sent_ = false;
-    client->prune_pending_requests();
+    if (current_request_id_ >= 0)
+    {
+        client->remove_pending_request(current_request_id_);
+        current_request_id_ = -1; // Reset current request ID after removing it
+    }
 }
-
 
 }; // namespace robotnik_charge
