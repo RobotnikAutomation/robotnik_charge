@@ -346,8 +346,20 @@ void RobotnikCharge::handle_charge_steps(std::shared_ptr<Timer>& timer)
       if(is_charging_)
       {
         switch_to_state(RobotnikChargeState::Charging, timer);
+        break;
       }
-      else if ((this->get_clock()->now() - init_charging_time_).seconds() > params_.timeout_charging_detection)
+
+      double time_to_wait;
+      if (try_number_ < current_goal_.retries)
+      {
+        time_to_wait = params_.timeout_charging_detection;
+      }
+      else
+      {
+        time_to_wait = 10.0;
+      }
+      
+      if ((this->get_clock()->now() - init_charging_time_).seconds() > time_to_wait)
       {
         RCLCPP_WARN(this->get_logger(), "Charging timeout, retrying...");
         switch_to_state(RobotnikChargeState::Retry, timer);
