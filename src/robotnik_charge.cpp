@@ -267,11 +267,9 @@ void RobotnikCharge::execute_charge(const std::shared_ptr<GoalHandleCharge> goal
   try_number_ = 0;
   switch_to_state(RobotnikChargeState::DeactivatingLasers);
   auto step_timer = std::make_shared<Timer>(params_.step_timeout);
-  auto charging_timer = std::make_shared<Timer>(params_.timeout_charging_detection);
 
   while(rclcpp::ok() && try_number_ <= current_goal_.retries)
   {
-
     if(is_charging_)
     {
       switch_to_state(RobotnikChargeState::Charging, step_timer);
@@ -338,7 +336,9 @@ void RobotnikCharge::handle_charge_steps(std::shared_ptr<Timer>& timer)
       if (set_charge_relay(true))
       {
         switch_to_state(RobotnikChargeState::WaitCharging, timer);
-        init_charging_time_ = this->get_clock()->now();
+        double time_to_wait = try_number_ < current_goal_.retries ?
+          params_.timeout_charging_detection : 10.0;
+        timer->change_duration(time_to_wait);
       }
       break;
 
@@ -346,23 +346,8 @@ void RobotnikCharge::handle_charge_steps(std::shared_ptr<Timer>& timer)
       if(is_charging_)
       {
         switch_to_state(RobotnikChargeState::Charging, timer);
+        timer->change_duration(params_.step_timeout);
         break;
-      }
-
-      double time_to_wait;
-      if (try_number_ < current_goal_.retries)
-      {
-        time_to_wait = params_.timeout_charging_detection;
-      }
-      else
-      {
-        time_to_wait = 10.0;
-      }
-      
-      if ((this->get_clock()->now() - init_charging_time_).seconds() > time_to_wait)
-      {
-        RCLCPP_WARN(this->get_logger(), "Charging timeout, retrying...");
-        switch_to_state(RobotnikChargeState::Retry, timer);
       }
       break;
 
@@ -630,7 +615,9 @@ void RobotnikCharge::handle_timeout_for_steps(std::shared_ptr<Timer>& timer)
       break;
 
     case RobotnikChargeState::WaitCharging:
+      RCLCPP_WARN(this->get_logger(), "Charging timeout, retrying...");
       switch_to_state(RobotnikChargeState::Retry, timer);
+      timer->change_duration(params_.step_timeout);
       break;
 
     default:

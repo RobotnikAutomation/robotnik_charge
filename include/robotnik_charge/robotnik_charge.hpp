@@ -167,7 +167,6 @@ private:
 
   //Variables
   int try_number_;
-  rclcpp::Time init_charging_time_;
   bool is_charging_;
   Pose remaining_;
   std::string docking_operation_mode_;

@@ -144,8 +144,6 @@ void RobotnikCharge::wait_charging()
 void RobotnikCharge::retry()
 {
   RCLCPP_INFO(this->get_logger(), "Retrying. Attempt: %d", try_number_);
-  init_charging_time_ = this->get_clock()->now();
-
   send_move_backwards();
 
 }

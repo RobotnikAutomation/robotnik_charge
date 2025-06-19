@@ -42,6 +42,11 @@ public:
         return std::chrono::duration<double>(std::chrono::steady_clock::now() - init_time_).count();
     }
 
+    void change_duration(const double new_duration)
+    {
+        duration_ = new_duration;
+    }
+
 private:
     double duration_;
     std::chrono::steady_clock::time_point init_time_;

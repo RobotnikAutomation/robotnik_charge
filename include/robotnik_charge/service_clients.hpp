@@ -36,11 +36,11 @@ void RobotnikCharge::service_call(std::shared_ptr<rclcpp::Client<T>>& client,
                 RCLCPP_ERROR(this->get_logger(), "Service %s not available", service_name);
             }
 
-            callback_executed = std::make_shared<bool>(false); // Return false if service is not available
+            callback_executed = std::make_shared<bool>(false); // callback_executed false if service is not available
             return;
         }
 
-        callback_executed = nullptr; // Init success variable. If service request was not sent yet, this should be null
+        callback_executed = nullptr; // Init callback_executed variable. If service request was not sent yet, this should be null
         // Service call and callback defined
         auto future = client->async_send_request(request, [this, &response, &callback_executed, service_name](const typename rclcpp::Client<T>::SharedFuture shared_future)
         {
@@ -60,7 +60,7 @@ void RobotnikCharge::service_call(std::shared_ptr<rclcpp::Client<T>>& client,
         service_request_sent_ = true;
     }
 
-    if (callback_executed) // success != nullptr; Callback executed
+    if (callback_executed) // callback_executed != nullptr; Callback executed
     {
         service_request_sent_ = false; // Reset the request sent flag after callback has been executed
     }
