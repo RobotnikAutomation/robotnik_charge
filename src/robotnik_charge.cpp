@@ -139,8 +139,8 @@ void RobotnikCharge::params_timer_callback()
 bool RobotnikCharge::can_charge_be_accepted(std::shared_ptr<const Charge::Goal> goal, std::string& response)
 {
   // Check if the action server is in a valid state
-  if(not (charge_manager_state_ == RobotnikChargeState::Init) and
-    not (charge_manager_state_ == RobotnikChargeState::Finished))
+  if(charge_manager_state_ != RobotnikChargeState::Init and
+    charge_manager_state_ != RobotnikChargeState::Finished)
   {
     response = "There is another action running";
     return false;
@@ -363,7 +363,14 @@ void RobotnikCharge::handle_charge_steps(std::shared_ptr<Timer>& timer)
 
     case RobotnikChargeState::Retry:
       retry();
-      switch_to_state(RobotnikChargeState::MovingBackwards, timer);
+      switch_to_state(RobotnikChargeState::DeactivateRelay, timer);
+      break;
+    
+    case RobotnikChargeState::DeactivateRelay:
+      if (set_charge_relay(false))
+      {
+        switch_to_state(RobotnikChargeState::MovingBackwards, timer);
+      }
       break;
 
     case RobotnikChargeState::MovingBackwards:
@@ -396,6 +403,8 @@ void RobotnikCharge::switch_to_state(RobotnikChargeState new_state, std::shared_
   {
     timer->reset();
   }
+  RCLCPP_INFO(this->get_logger(), "switch_to_state: switching from %s to %s",
+              state_to_text(charge_manager_state_).c_str(), state_to_text(new_state).c_str());
   charge_manager_state_ = new_state;
 }
 
@@ -404,7 +413,7 @@ bool RobotnikCharge::can_uncharge_be_accepted(std::shared_ptr<const Uncharge::Go
   (void)goal; // Unused parameter, can be used in the future for more complex uncharge goals
 
   // Check if the action server is in a valid state
-  if(not (charge_manager_state_ == RobotnikChargeState::Init) and not (charge_manager_state_ == RobotnikChargeState::Finished))
+  if(charge_manager_state_ != RobotnikChargeState::Init and charge_manager_state_ != RobotnikChargeState::Finished)
   {
     response = "There is another action running";
     return false;
