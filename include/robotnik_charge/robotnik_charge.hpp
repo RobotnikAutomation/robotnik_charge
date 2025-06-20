@@ -169,6 +169,7 @@ private:
   int try_number_;
   bool is_charging_;
   Pose remaining_;
+  double time_in_action_, time_in_step_;
   std::string docking_operation_mode_;
 
   geometry_msgs::msg::TransformStamped dock_frame_transform_;

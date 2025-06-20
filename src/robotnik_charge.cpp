@@ -114,6 +114,8 @@ RobotnikCharge::RobotnikCharge()
   is_charging_ = false;
   remaining_ = Pose();
   try_number_ = 0;
+  time_in_action_ = 0;
+  time_in_step_ = 0;
   dock_finished_ = false;
   move_finished_ = false;
   service_callback_executed_ = nullptr;
@@ -283,6 +285,9 @@ void RobotnikCharge::execute_charge(const std::shared_ptr<GoalHandleCharge> goal
     {
       handle_charge_steps(step_timer);
     }
+  
+    time_in_step_ = step_timer->get_elapsed_time();
+    time_in_action_ = step_timer->get_global_elapsed_time();
 
     if (charge_manager_state_ == RobotnikChargeState::Finished)
     {
@@ -497,6 +502,8 @@ void RobotnikCharge::execute_uncharge(const std::shared_ptr<GoalHandleUncharge> 
     {
       handle_uncharge_steps(step_timer);
     }
+    time_in_step_ = step_timer->get_elapsed_time();
+    time_in_action_ = step_timer->get_global_elapsed_time();
 
     if (charge_manager_state_ == RobotnikChargeState::Finished)
     {

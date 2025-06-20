@@ -176,6 +176,8 @@ void RobotnikCharge::send_charge_feedback()
 {
   auto feedback = std::make_shared<Charge::Feedback>();
 
+  feedback->time_in_action = time_in_action_;
+  feedback->time_in_step = time_in_step_;
   feedback->remaining_distance = remaining_;
   feedback->status = state_to_text(charge_manager_state_);
   feedback->try_number = try_number_;
@@ -186,6 +188,8 @@ void RobotnikCharge::send_uncharge_feedback()
 {
   auto feedback = std::make_shared<Uncharge::Feedback>();
 
+  feedback->time_in_action = time_in_action_;
+  feedback->time_in_step = time_in_step_;
   feedback->remaining_distance = remaining_;
   feedback->status = state_to_text(charge_manager_state_);
   current_uncharge_handle_->publish_feedback(feedback);
