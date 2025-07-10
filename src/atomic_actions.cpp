@@ -14,7 +14,7 @@ void RobotnikCharge::change_laser_mode(bool activate)
 {
   //Change Mode
   auto request = std::make_shared<robotnik_common_msgs::srv::SetString::Request>();
-  request->data = activate ? "docking" : "standard";
+  request->data = activate ? "charging_station" : "standard";
 
   RCLCPP_INFO(this->get_logger(), "Changing laser mode to %s", request->data.c_str());
   while (!set_laser_mode_->wait_for_service(1s))
