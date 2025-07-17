@@ -126,8 +126,8 @@ These are the parameters:
 
   * **laser_mode_during_action**:
     * type: string
-    * default_value: "docking"
-    * description: "Laser mode during the charge or uncharge action. default: docking"
+    * default_value: "charging_station"
+    * description: "Laser mode during the charge or uncharge action. default: charging_station"
 
   * **laser_mode_after_action**:
     * type: string
