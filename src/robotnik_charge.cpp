@@ -31,7 +31,7 @@ RobotnikCharge::RobotnikCharge()
     std::bind(&RobotnikCharge::battery_status_callback, this, _1));
 
   docking_status_subscription_ = create_subscription<DockingStatus>(
-    "charge_manager/status", 10,
+    "charge_manager/docking_status_stamped", 10,
     std::bind(&RobotnikCharge::docking_status_callback, this, _1));
 
   // Service client to set relay
