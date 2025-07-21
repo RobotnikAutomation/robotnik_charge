@@ -382,6 +382,10 @@ void RobotnikCharge::handle_charge_steps(std::shared_ptr<Timer>& timer)
       break;
 
     case RobotnikChargeState::Cancelled:
+      if (current_charge_handle_->is_canceling())
+      {
+        charge_cancel();
+      }
       switch_to_state(RobotnikChargeState::Finished, timer);
       send_charge_feedback();
       break;
@@ -586,6 +590,10 @@ void RobotnikCharge::handle_uncharge_steps(std::shared_ptr<Timer>& timer)
       break;
 
     case RobotnikChargeState::Cancelled:
+      if (current_uncharge_handle_->is_canceling())
+      {
+        uncharge_cancel();
+      }
       switch_to_state(RobotnikChargeState::Finished, timer);
       send_uncharge_feedback();
       break;

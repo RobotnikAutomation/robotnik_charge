@@ -247,6 +247,20 @@ void RobotnikCharge::charge_abort()
   current_charge_handle_->abort(result);
 }
 
+void RobotnikCharge::charge_cancel()
+{
+  // Cancel actions
+  dock_action_client_->async_cancel_all_goals();
+  move_action_client_->async_cancel_all_goals();
+
+  //Send result
+  auto result = std::make_shared<Charge::Result>();
+  result->response.message = "Charge cancel requested";
+  result->response.success = false;
+
+  current_charge_handle_->canceled(result);
+}
+
 void RobotnikCharge::uncharge_abort()
 {
   RCLCPP_WARN(this->get_logger(), "Aborting");
@@ -260,6 +274,21 @@ void RobotnikCharge::uncharge_abort()
   result->response.success = false;
 
   current_uncharge_handle_->abort(result);
+}
+
+void RobotnikCharge::uncharge_cancel()
+{
+  RCLCPP_WARN(this->get_logger(), "Canceling");
+
+  // Cancel actions
+  move_action_client_->async_cancel_all_goals();
+
+  //Send result
+  auto result = std::make_shared<Uncharge::Result>();
+  result->response.message = "Uncharge cancel requested";
+  result->response.success = false;
+
+  current_uncharge_handle_->canceled(result);
 }
 
 std::string RobotnikCharge::state_to_text(RobotnikChargeState state)

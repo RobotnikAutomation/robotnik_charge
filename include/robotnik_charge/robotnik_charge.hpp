@@ -139,6 +139,8 @@ private:
   void retry();
   void charge_abort();
   void uncharge_abort();
+  void charge_cancel();
+  void uncharge_cancel();
 
   std::string state_to_text(RobotnikChargeState state);
   void switch_to_state(RobotnikChargeState new_state, std::shared_ptr<Timer> timer = nullptr);
