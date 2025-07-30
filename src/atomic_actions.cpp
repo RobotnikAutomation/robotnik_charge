@@ -85,9 +85,9 @@ void RobotnikCharge::send_dock_goal()
   dock_goal.dock_frame = current_goal_.dock_frame;
   dock_goal.robot_dock_frame = current_goal_.robot_dock_frame;
 
-  dock_goal.maximum_velocity.linear.x = params_.max_velocity_x;
-  dock_goal.maximum_velocity.linear.y = params_.max_velocity_y;
-  dock_goal.maximum_velocity.angular.z = params_.max_velocity_yaw;
+  dock_goal.maximum_velocity.linear.x = params_.dock.max_velocity.x;
+  dock_goal.maximum_velocity.linear.y = params_.dock.max_velocity.y;
+  dock_goal.maximum_velocity.angular.z = params_.dock.max_velocity.yaw;
 
   Pose offset;
   offset.x = -params_.charge_contact_distance_from_marker - current_goal_.dock_offset;
@@ -100,9 +100,6 @@ void RobotnikCharge::send_dock_goal()
 void RobotnikCharge::send_move_goal()
 {
   RCLCPP_INFO(this->get_logger(), "Sending move goal");
-  move_finished_ = false;
-
-  Move::Goal move_goal;
   Pose target;
 
   try
@@ -120,10 +117,34 @@ void RobotnikCharge::send_move_goal()
     target.x = current_goal_.dock_offset;
   }
 
-  move_goal.goal = target;
+  send_move(target);
+}
+
+void RobotnikCharge::send_move_backwards()
+{
+  Pose target;
+  target.x = -params_.step_back_distance;
+  send_move(target);
+}
+
+void RobotnikCharge::send_rotation()
+{
+  Pose target;
+  target.theta = params_.rotation;
+  send_move(target);
+}
+
+void RobotnikCharge::send_move(Pose pose)
+{
+  move_finished_ = false;
+  Move::Goal move_goal;
+
+  move_goal.goal = pose;
+  move_goal.maximum_velocity.linear.x = params_.move.max_velocity.x;
+  move_goal.maximum_velocity.linear.y = params_.move.max_velocity.y;
+  move_goal.maximum_velocity.angular.z = params_.move.max_velocity.yaw;
 
   move_action_client_->async_send_goal(move_goal, move_send_goal_options_);
-
 }
 
 void RobotnikCharge::wait_charging()
@@ -146,30 +167,6 @@ void RobotnikCharge::retry()
   RCLCPP_INFO(this->get_logger(), "Retrying. Attempt: %d", try_number_);
   send_move_backwards();
 
-}
-
-void RobotnikCharge::send_move_backwards()
-{
-
-  move_finished_ = false;
-  Move::Goal move_goal;
-  Pose target;
-  target.x = -params_.step_back_distance;
-  move_goal.goal = target;
-
-  move_action_client_->async_send_goal(move_goal, move_send_goal_options_);
-}
-
-void RobotnikCharge::send_rotation()
-{
-  move_finished_ = false;
-  Move::Goal move_goal;
-  Pose target;
-  target.theta = params_.rotation;
-
-  move_goal.goal = target;
-
-  move_action_client_->async_send_goal(move_goal, move_send_goal_options_);
 }
 
 void RobotnikCharge::send_charge_feedback()

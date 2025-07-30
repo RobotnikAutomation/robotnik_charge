@@ -97,16 +97,6 @@ These are the parameters:
     * read_only: true
     * description: "Seconds of timeout that each step of the charging or uncharging method must last. default: 30.0"
 
-  * **dock_action**:
-    * type: string
-    * default_value: "/smooth_drive/dock"
-    * description: "Name of dock action. default: /smooth_drive/dock"
-
-  * **move_action**:
-    * type: string
-    * default_value: "/move"
-    * description: "Name of move action. default: /move"
-
   * **charge_contact_distance_from_marker**:
     * type: double
     * default_value: 0.14
@@ -144,17 +134,42 @@ These are the parameters:
     * default_value: 0.0
     * description: "Rotation to apply after uncharge step back. default: 0.0"
 
-  * **max_velocity_x**:
+  * **dock.action_namespace**:
+    * type: string
+    * default_value: "/smooth_drive/dock"
+    * description: "Name of dock action. default: /smooth_drive/dock"
+
+  * **dock.max_velocity.x**:
     * type: double
     * default_value: 1.0
-    * description: "Maximum velocity in x axis. default: 1.0"
+    * description: "Maximum velocity in x axis for dock action. default: 1.0"
 
-  * **max_velocity_y**:
+  * **dock.max_velocity.y**:
     * type: double
     * default_value: 0.0
-    * description: "Maximum velocity in y axis. default: 0.0"
+    * description: "Maximum velocity in y axis for dock action. default: 0.0"
 
-  * **max_velocity_yaw**:
+  * **dock.max_velocity.yaw**:
     * type: double
     * default_value: 1.0
-    * description: "Maximum velocity in yaw. default: 1.0"
+    * description: "Maximum velocity in yaw for dock action. default: 1.0"
+
+  * **move.action_namespace**:
+    * type: string
+    * default_value: "/move"
+    * description: "Name of move action. default: /move"
+
+  * **move.max_velocity.x**:
+    * type: double
+    * default_value: 0.0
+    * description: "Maximum velocity in x axis for move action. default: 0.0"
+
+  * **move.max_velocity.y**:
+    * type: double
+    * default_value: 0.0
+    * description: "Maximum velocity in y axis for move action. default: 0.0"
+
+  * **move.max_velocity.yaw**:
+    * type: double
+    * default_value: 0.0
+    * description: "Maximum velocity in yaw for move action. default: 0.0"

@@ -134,6 +134,7 @@ private:
   void send_move_goal();
   void send_move_backwards();
   void send_rotation();
+  void send_move(Pose pose);
   bool set_charge_relay(bool activate);
   bool set_dock_laser_mode(bool activate);
   void retry();
