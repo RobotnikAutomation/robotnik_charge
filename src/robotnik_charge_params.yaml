@@ -1,112 +1,36 @@
-robotnik_charge:
+robot:
+  robotnik_charge:
+    ros__parameters:
 
-  rate:
-    type: int
-    default_value: 10
-    read_only: true
-    description: "Frequency to run the action. default: 10"
-    validation:
-      gt<>: 0
+      rate: 10
+      step_timeout: 30.0
+      timeout_charging_detection: 5
+      charge_contact_distance_from_marker: 0.105
+      has_safety_lasers: false
+      laser_mode_during_action: "docking"
+      laser_mode_after_action: "standard"
+      step_back_distance: 0.5
+      rotation: 0.0
+      dock:
+        action_namespace: "accurate_smooth_dock/dock"
+        max_velocity:
+          x: 0.1
+          y: 0.1
+          yaw: 0.1
+      move:
+        action_namespace: "move"
+        max_velocity:
+          x: 0.1
+          y: 0.1
+          yaw: 0.1
 
-  step_timeout:
-    type: double
-    default_value: 30.0
-    read_only: true
-    description: "Seconds of timeout that each step of the charging or uncharging method must last. default: 30.0"
-    validation:
-      gt<>: 0
+      # marker
+      # offset X
+      # predock_offset
+      # final_approach_vel_x:
+      # timeout_charging_detection: el tiempo que tarda en esperar a que la docking diga que está cargando
+      # timeout robot_moving: tbd
+      # str: stop_condition: position, (magnetic_field, motor_current), ...
+
+
   
-  charge_contact_distance_from_marker:
-    type: double
-    default_value: 0.14
-    read_only: true
-    description: "Distance from marker to charge contact in docking station. default: 0.14"
-    validation:
-      gt_eq<>: 0
-
-  timeout_charging_detection:
-    type: int
-    default_value: 1
-    read_only: true
-    description: "Seconds to wait to detect charge. default: 1"
-    validation:
-      gt_eq<>: 0
-
-  has_safety_lasers:
-    type: bool
-    default_value: false
-    description: "If the robot has safety lasers, the safety mode must change. default: false"
-
-  laser_mode_during_action:
-    type: string
-    default_value: "charging_station"
-    description: "Laser mode during the charge or uncharge action. default: charging_station"
-
-  laser_mode_after_action:
-    type: string
-    default_value: "standard"
-    description: "Laser mode at the end of the uncharge action. default: standard"
-
-  step_back_distance:
-    type: double
-    default_value: 0.5
-    description: "Distance to step back during uncharge. default: 0.5"
-    validation:
-      gt<>: 0
-
-  rotation:
-    type: double
-    default_value: 0.0
-    description: "Rotation to apply after uncharge step back. default: 0.0"
-    validation:
-      bounds<>: [-3.14,3.14]
-
-  dock:
-    action_namespace:
-      type: string
-      default_value: "/smooth_drive/dock"
-      description: "Name of dock action. default: /smooth_drive/dock"
-    max_velocity:
-      x:
-        type: double
-        default_value: 1.0
-        description: "Maximum velocity in x axis for dock action. default: 1.0"
-        validation:
-          gt<>: 0
-      y:
-        type: double
-        default_value: 0.0
-        description: "Maximum velocity in y axis for dock action. default: 0.0"
-        validation:
-          gt_eq<>: 0
-      yaw:
-        type: double
-        default_value: 1.0
-        description: "Maximum velocity in yaw for dock action. default: 1.0"
-        validation:
-          gt<>: 0
-
-  move:
-    action_namespace:
-      type: string
-      default_value: "/move"
-      description: "Name of move action. default: /move"
-    max_velocity:
-      x:
-        type: double
-        default_value: 0.0
-        description: "Maximum velocity in x axis for move action. default: 0.0"
-        validation:
-          gt<>: 0
-      y:
-        type: double
-        default_value: 0.0
-        description: "Maximum velocity in y axis for move action. default: 0.0"
-        validation:
-          gt_eq<>: 0
-      yaw:
-        type: double
-        default_value: 0.0
-        description: "Maximum velocity in yaw for move action. default: 0.0"
-        validation:
-          gt<>: 0
