@@ -31,7 +31,7 @@ RobotnikCharge::RobotnikCharge()
     std::bind(&RobotnikCharge::battery_status_callback, this, _1));
 
   docking_status_subscription_ = create_subscription<DockingStatus>(
-    "charge_manager/docking_status_stamped", 10,
+    "charge_manager/status", 10,
     std::bind(&RobotnikCharge::docking_status_callback, this, _1));
 
   // Service client to set relay
@@ -284,7 +284,7 @@ void RobotnikCharge::execute_charge(const std::shared_ptr<GoalHandleCharge> goal
     {
       handle_charge_steps(step_timer);
     }
-  
+
     time_in_step_ = step_timer->get_elapsed_time();
     time_in_action_ = step_timer->get_global_elapsed_time();
 
@@ -364,7 +364,7 @@ void RobotnikCharge::handle_charge_steps(std::shared_ptr<Timer>& timer)
       retry();
       switch_to_state(RobotnikChargeState::DeactivateRelay, timer);
       break;
-    
+
     case RobotnikChargeState::DeactivateRelay:
       if (set_charge_relay(false))
       {
