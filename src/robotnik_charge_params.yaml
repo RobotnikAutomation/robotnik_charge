@@ -8,11 +8,11 @@ robotnik_charge:
     validation:
       gt<>: 0
 
-  charge_action_timeout:
+  step_timeout:
     type: double
-    default_value: 60.0
+    default_value: 30.0
     read_only: true
-    description: "Seconds of timeout that the charging method must last. default: 60.0"
+    description: "Seconds of timeout that each step of the charging or uncharging method must last. default: 30.0"
     validation:
       gt<>: 0
 
@@ -46,6 +46,30 @@ robotnik_charge:
     type: bool
     default_value: false
     description: "If the robot has safety lasers, the safety mode must change. default: false"
+
+  laser_mode_during_action:
+    type: string
+    default_value: "charging_station"
+    description: "Laser mode during the charge or uncharge action. default: charging_station"
+
+  laser_mode_after_action:
+    type: string
+    default_value: "standard"
+    description: "Laser mode at the end of the uncharge action. default: standard"
+
+  step_back_distance:
+    type: double
+    default_value: 0.5
+    description: "Distance to step back during uncharge. default: 0.5"
+    validation:
+      gt<>: 0
+
+  rotation:
+    type: double
+    default_value: 0.0
+    description: "Rotation to apply after uncharge step back. default: 0.0"
+    validation:
+      bounds<>: [-3.14,3.14]
 
   max_velocity_x:
     type: double
