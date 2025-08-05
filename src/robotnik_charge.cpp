@@ -276,7 +276,6 @@ void RobotnikCharge::execute_charge(const std::shared_ptr<GoalHandleCharge> goal
     {
       switch_to_state(RobotnikChargeState::Charging, step_timer);
     }
-
     if (step_timer->is_timedout())
     {
       handle_timeout_for_steps(step_timer);
