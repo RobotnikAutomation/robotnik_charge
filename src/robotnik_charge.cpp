@@ -276,7 +276,6 @@ void RobotnikCharge::execute_charge(const std::shared_ptr<GoalHandleCharge> goal
     {
       switch_to_state(RobotnikChargeState::Charging, step_timer);
     }
-
     if (step_timer->is_timedout())
     {
       handle_timeout_for_steps(step_timer);
@@ -401,15 +400,41 @@ void RobotnikCharge::handle_charge_steps(std::shared_ptr<Timer>& timer)
   }
 }
 
-void RobotnikCharge::switch_to_state(RobotnikChargeState new_state, std::shared_ptr<Timer> timer)
+void RobotnikCharge::switch_to_state(const RobotnikChargeState new_state, std::shared_ptr<Timer> timer)
 {
-  if (timer)
+  if (is_state_change_possible(new_state))
   {
-    timer->reset();
+    if (timer)
+    {
+      timer->reset();
+    }
+    RCLCPP_INFO(this->get_logger(), "switch_to_state: switching from %s to %s",
+                state_to_text(charge_manager_state_).c_str(), state_to_text(new_state).c_str());
+    charge_manager_state_ = new_state;
   }
-  RCLCPP_INFO(this->get_logger(), "switch_to_state: switching from %s to %s",
-              state_to_text(charge_manager_state_).c_str(), state_to_text(new_state).c_str());
-  charge_manager_state_ = new_state;
+  else
+  {
+    RCLCPP_WARN(this->get_logger(), "switch_to_state: Invalid state change from %s to %s",
+                state_to_text(charge_manager_state_).c_str(), state_to_text(new_state).c_str());
+  }
+}
+
+bool RobotnikCharge::is_state_change_possible(const RobotnikChargeState new_state)
+{
+  // Check if the state change is valid
+  switch (new_state)
+  {
+    case RobotnikChargeState::Charging:
+      return charge_manager_state_ != RobotnikChargeState::Retry &&
+            charge_manager_state_ != RobotnikChargeState::DeactivateRelay &&
+            charge_manager_state_ != RobotnikChargeState::MovingBackwards;
+    case RobotnikChargeState::Aborted:
+      return charge_manager_state_ != RobotnikChargeState::Finished &&
+            charge_manager_state_ != RobotnikChargeState::Init &&
+            charge_manager_state_ != RobotnikChargeState::Cancelled;
+    default:
+      return magic_enum::enum_contains<RobotnikChargeState>(new_state);
+  }
 }
 
 bool RobotnikCharge::can_uncharge_be_accepted(std::shared_ptr<const Uncharge::Goal>goal, std::string& response)

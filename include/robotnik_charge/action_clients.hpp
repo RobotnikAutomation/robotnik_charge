@@ -12,12 +12,7 @@ void RobotnikCharge::action_feedback_callback(const typename rclcpp_action::Clie
   if (!goal_handle)
   {
     RCLCPP_ERROR(this->get_logger(), "Action %s was rejected by server", action_name);
-    if (charge_manager_state_ != RobotnikChargeState::Finished &&
-        charge_manager_state_ != RobotnikChargeState::Init &&
-        charge_manager_state_ != RobotnikChargeState::Cancelled)
-    {
-      switch_to_state(RobotnikChargeState::Aborted);
-    }
+    switch_to_state(RobotnikChargeState::Aborted);
   }
 }
 
@@ -28,12 +23,7 @@ void RobotnikCharge::action_goal_callback(const typename rclcpp_action::ClientGo
   if (!goal_handle)
   {
     RCLCPP_ERROR(this->get_logger(), "Action %s was rejected by server", action_name);
-    if (charge_manager_state_ != RobotnikChargeState::Finished &&
-        charge_manager_state_ != RobotnikChargeState::Init &&
-        charge_manager_state_ != RobotnikChargeState::Cancelled)
-    {
-      switch_to_state(RobotnikChargeState::Aborted);
-    }
+    switch_to_state(RobotnikChargeState::Aborted);
   }
   else
   {
@@ -57,12 +47,7 @@ void RobotnikCharge::action_result_callback(const typename rclcpp_action::Client
     case rclcpp_action::ResultCode::CANCELED:
     default:
       RCLCPP_ERROR(this->get_logger(), "Action %s failed.", action_name);
-      if (charge_manager_state_ != RobotnikChargeState::Finished &&
-        charge_manager_state_ != RobotnikChargeState::Init &&
-        charge_manager_state_ != RobotnikChargeState::Cancelled)
-      {
-        switch_to_state(RobotnikChargeState::Aborted);
-      }
+      switch_to_state(RobotnikChargeState::Aborted);
       break;
   }
 }
