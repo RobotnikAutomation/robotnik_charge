@@ -63,38 +63,38 @@ RobotnikCharge::RobotnikCharge()
   }
 
   //Dock Action Client
-  dock_action_client_ = rclcpp_action::create_client<Dock>(this, params_.dock_action);
+  dock_action_client_ = rclcpp_action::create_client<Dock>(this, params_.dock.action_namespace);
 
   dock_send_goal_options_ = rclcpp_action::Client<Dock>::SendGoalOptions();
   dock_send_goal_options_.goal_response_callback = [this](const GoalHandleDock::SharedPtr &goal_handle) {
-    action_goal_callback<Dock>(goal_handle, params_.dock_action.c_str());
+    action_goal_callback<Dock>(goal_handle, params_.dock.action_namespace.c_str());
   };
   dock_send_goal_options_.feedback_callback = [this](const GoalHandleDock::SharedPtr &goal_handle,
                                                   const std::shared_ptr<const Dock::Feedback> feedback) {
-    action_feedback_callback<Dock>(goal_handle, feedback, params_.dock_action.c_str());
+    action_feedback_callback<Dock>(goal_handle, feedback, params_.dock.action_namespace.c_str());
     // Update remaining distance or other feedback information
     remaining_ = feedback->remaining;
   };
   dock_send_goal_options_.result_callback = [this](const GoalHandleDock::WrappedResult &result) {
-    action_result_callback<Dock>(result, dock_finished_, params_.dock_action.c_str());
+    action_result_callback<Dock>(result, dock_finished_, params_.dock.action_namespace.c_str());
   };
 
   //Move Action Client
-  move_action_client_ = rclcpp_action::create_client<Move>(this, params_.move_action);
+  move_action_client_ = rclcpp_action::create_client<Move>(this, params_.move.action_namespace);
 
   move_send_goal_options_ = rclcpp_action::Client<Move>::SendGoalOptions();
 
   move_send_goal_options_.goal_response_callback = [this](const GoalHandleMove::SharedPtr &goal_handle) {
-    action_goal_callback<Move>(goal_handle, params_.move_action.c_str());
+    action_goal_callback<Move>(goal_handle, params_.move.action_namespace.c_str());
   };
   move_send_goal_options_.feedback_callback = [this](const GoalHandleMove::SharedPtr &goal_handle,
                                                   const std::shared_ptr<const Move::Feedback> feedback) {
-    action_feedback_callback<Move>(goal_handle, feedback, params_.move_action.c_str());
+    action_feedback_callback<Move>(goal_handle, feedback, params_.move.action_namespace.c_str());
     // Update remaining distance or other feedback information
     remaining_ = feedback->remaining;
   };
   move_send_goal_options_.result_callback = [this](const GoalHandleMove::WrappedResult &result) {
-    action_result_callback<Move>(result, move_finished_, params_.move_action.c_str());
+    action_result_callback<Move>(result, move_finished_, params_.move.action_namespace.c_str());
   };
 
   //Charge Action Server
