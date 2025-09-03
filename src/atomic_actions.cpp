@@ -102,18 +102,27 @@ void RobotnikCharge::send_move_goal()
   RCLCPP_INFO(this->get_logger(), "Sending move goal");
   Pose target;
 
+  const std::string robot_frame = current_charge_handle_->get_goal()->robot_dock_frame;
+  const std::string dock_frame  = current_charge_handle_->get_goal()->dock_frame;
+  const std::string fixed_frame = "odom"; //params_.fixed_frame;  // e.g. "map" or "odom"
+
   try
   {
     dock_frame_transform_ = tf_buffer_->lookupTransform(
-      current_charge_handle_->get_goal().get()->robot_dock_frame, current_charge_handle_->get_goal().get()->dock_frame,
-        tf2::TimePointZero);
-    target.x = dock_frame_transform_.transform.translation.x - params_.charge_contact_distance_from_marker;
+      robot_frame, tf2::TimePointZero,
+      dock_frame,  tf2::TimePointZero,
+      fixed_frame,
+      tf2::durationFromSec(0.2));
+
+    target.x = dock_frame_transform_.transform.translation.x
+             - params_.charge_contact_distance_from_marker;
   }
   catch (const tf2::TransformException &ex)
   {
-    RCLCPP_ERROR(
-        this->get_logger(), "Could not transform %s to %s: %s",
-        current_charge_handle_->get_goal().get()->dock_frame.c_str(), current_charge_handle_->get_goal().get()->robot_dock_frame.c_str(), ex.what());
+    RCLCPP_WARN(
+        get_logger(),
+        "Could not transform %s -> %s using fixed_frame %s: %s. Using dock_offset instead.",
+        dock_frame.c_str(), robot_frame.c_str(), fixed_frame.c_str(), ex.what());
     target.x = current_goal_.dock_offset;
   }
 
