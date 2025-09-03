@@ -104,7 +104,7 @@ void RobotnikCharge::send_move_goal()
 
   const std::string robot_frame = current_charge_handle_->get_goal()->robot_dock_frame;
   const std::string dock_frame  = current_charge_handle_->get_goal()->dock_frame;
-  const std::string fixed_frame = "odom"; //params_.fixed_frame;  // e.g. "map" or "odom"
+  const std::string fixed_frame = params_.fixed_frame;
 
   try
   {

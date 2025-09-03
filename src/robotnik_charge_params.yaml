@@ -8,6 +8,11 @@ robotnik_charge:
     validation:
       gt<>: 0
 
+  fixed_frame:
+    type: string
+    default_value: "robot_odom"
+    description: "Fixed frame used to compute distance between robot_dock_frame and dock_frame"
+
   step_timeout:
     type: double
     default_value: 30.0

@@ -42,12 +42,11 @@ If there is any issue with this, the action will be rejected.
 #### Charge action
 1. If the robot has safety laser, change to the mode during action**(Still pending to be implemented)**
 2. Send dock goal with offset.
-3. Once dock is compleated, send move goal.
-4. Once move is compleated, activate relay.
+3. Once dock is completed, send move goal.
+4. Once move is completed, activate relay.
 5. Wait for charge detected.
 6. If not charging, move backwards and repeat.
-7. If all tries are compleated, wait forced to 10s.
-8. If not charging, move backwards and abort.
+7. If all tries are completed, move backwards and abort.
 
 If during the process there is any failure, the action is aborted.
 
@@ -90,6 +89,11 @@ These are the parameters:
     * default_value: 10
     * read_only: true
     * description: "Frequency to run the action. default: 10"
+
+  * **fixed_frame**:
+    * type: string
+    * default_value: "robot_odom"
+    * description: "Fixed frame used to compute distance between robot_dock_frame and dock_frame"
 
   * **step_timeout**:
     * type: double

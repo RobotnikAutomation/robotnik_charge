@@ -1,13 +1,13 @@
-robot:
+/**:
   robotnik_charge:
     ros__parameters:
-
       rate: 10
+      fixed_frame: "robot_odom"
       step_timeout: 30.0
       timeout_charging_detection: 5
       charge_contact_distance_from_marker: 0.105
       has_safety_lasers: false
-      laser_mode_during_action: "docking"
+      laser_mode_during_action: "charging_station"
       laser_mode_after_action: "standard"
       step_back_distance: 0.5
       rotation: 0.0
@@ -28,9 +28,5 @@ robot:
       # offset X
       # predock_offset
       # final_approach_vel_x:
-      # timeout_charging_detection: el tiempo que tarda en esperar a que la docking diga que está cargando
       # timeout robot_moving: tbd
       # str: stop_condition: position, (magnetic_field, motor_current), ...
-
-
-  
