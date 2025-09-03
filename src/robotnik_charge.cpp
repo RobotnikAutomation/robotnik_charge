@@ -340,9 +340,7 @@ void RobotnikCharge::handle_charge_steps(std::shared_ptr<Timer>& timer)
       if (set_charge_relay(true))
       {
         switch_to_state(RobotnikChargeState::WaitCharging, timer);
-        double time_to_wait = try_number_ < current_goal_.retries ?
-          params_.timeout_charging_detection : 10.0;
-        timer->change_duration(time_to_wait);
+        timer->change_duration(params_.timeout_charging_detection);
       }
       break;
 
