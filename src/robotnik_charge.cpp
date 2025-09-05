@@ -297,6 +297,16 @@ void RobotnikCharge::execute_charge(const std::shared_ptr<GoalHandleCharge> goal
     loop_rate.sleep();
   }
 
+  // Switch back laser_docking to the original mode if retries exceeded
+  if (try_number_ > current_goal_.retries)
+  {
+    RCLCPP_WARN(this->get_logger(), "Max retries exceeded, aborting...");
+    if (params_.has_safety_lasers)
+    {
+      set_dock_laser_mode(false);
+    }
+  }
+
   send_charge_result(false);
   switch_to_state(RobotnikChargeState::Finished);
 }
