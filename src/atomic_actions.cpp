@@ -17,15 +17,43 @@ bool RobotnikCharge::set_dock_laser_mode(bool activate)
 
   auto request = std::make_shared<SetString::Request>();
   static auto response = std::make_shared<SetString::Response>();
+  static std::shared_ptr<bool> charge_laser_callback_executed = nullptr;
+  static std::shared_ptr<bool> uncharge_laser_callback_executed = nullptr;
+  
   request->data = activate ? params_.laser_mode_during_action : params_.laser_mode_after_action;
-  service_call(set_laser_mode_, request, response, service_callback_executed_);
+  
+  // Determine operation context based on current operation
+  // If we have an active charge handle, it's a charge operation
+  // If we have an active uncharge handle, it's an uncharge operation
+  ServiceOperationContext context;
+  std::shared_ptr<bool>* callback_ptr;
+  
+  if (current_charge_handle_ && !current_uncharge_handle_)
+  {
+    context = CHARGE_OPERATION;
+    callback_ptr = &charge_laser_callback_executed;
+  }
+  else if (current_uncharge_handle_ && !current_charge_handle_)
+  {
+    context = UNCHARGE_OPERATION;
+    callback_ptr = &uncharge_laser_callback_executed;
+  }
+  else
+  {
+    // Fallback - use charge context, but this shouldn't happen normally
+    RCLCPP_WARN(this->get_logger(), "Ambiguous operation context for laser mode service call");
+    context = CHARGE_OPERATION;
+    callback_ptr = &charge_laser_callback_executed;
+  }
+  
+  service_call(set_laser_mode_, request, response, *callback_ptr, context);
 
-  if (!service_callback_executed_) // Callback not executed yet
+  if (!(*callback_ptr)) // Callback not executed yet
   {
     return false;
   }
 
-  bool success = *service_callback_executed_ && response->response.success;
+  bool success = *(*callback_ptr) && response->response.success;
   if (success)
   {
     RCLCPP_INFO(this->get_logger(), "Laser mode changed successfully to %s", request->data.c_str());
@@ -36,7 +64,7 @@ bool RobotnikCharge::set_dock_laser_mode(bool activate)
       request->data.c_str(), response->response.message.c_str());
   }
 
-  service_callback_executed_ = nullptr; // Reset callback executed flag for next call
+  *callback_ptr = nullptr; // Reset callback executed flag for next call
   *response = SetString::Response(); // Reset response for next call
   return success;
 }
@@ -51,15 +79,41 @@ bool RobotnikCharge::set_charge_relay(bool activate)
 
   auto request = std::make_shared<SetBool::Request>();
   static auto response = std::make_shared<SetBool::Response>();
+  static std::shared_ptr<bool> charge_relay_callback_executed = nullptr;
+  static std::shared_ptr<bool> uncharge_relay_callback_executed = nullptr;
+  
   request->data = activate;
-  service_call(set_charger_relay_, request, response, service_callback_executed_);
+  
+  // Determine operation context based on current operation
+  ServiceOperationContext context;
+  std::shared_ptr<bool>* callback_ptr;
+  
+  if (current_charge_handle_ && !current_uncharge_handle_)
+  {
+    context = CHARGE_OPERATION;
+    callback_ptr = &charge_relay_callback_executed;
+  }
+  else if (current_uncharge_handle_ && !current_charge_handle_)
+  {
+    context = UNCHARGE_OPERATION;
+    callback_ptr = &uncharge_relay_callback_executed;
+  }
+  else
+  {
+    // Fallback - use charge context, but this shouldn't happen normally
+    RCLCPP_WARN(this->get_logger(), "Ambiguous operation context for relay service call");
+    context = CHARGE_OPERATION;
+    callback_ptr = &charge_relay_callback_executed;
+  }
+  
+  service_call(set_charger_relay_, request, response, *callback_ptr, context);
 
-  if (!service_callback_executed_) // Callback not executed yet
+  if (!(*callback_ptr)) // Callback not executed yet
   {
     return false;
   }
 
-  bool success = *service_callback_executed_ && response->success;
+  bool success = *(*callback_ptr) && response->success;
   if (success)
   {
     RCLCPP_INFO(this->get_logger(), "Charge relay set successfully to %s", request->data ? "true" : "false");
@@ -70,7 +124,7 @@ bool RobotnikCharge::set_charge_relay(bool activate)
       response->message.c_str());
   }
 
-  service_callback_executed_ = nullptr; // Reset callback executed flag for next call
+  *callback_ptr = nullptr; // Reset callback executed flag for next call
   *response = SetBool::Response(); // Reset response for next call
   return success;
 }

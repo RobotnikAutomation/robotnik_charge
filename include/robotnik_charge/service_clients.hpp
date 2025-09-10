@@ -20,9 +20,16 @@ template <typename T>
 void RobotnikCharge::service_call(std::shared_ptr<rclcpp::Client<T>>& client,
                                     std::shared_ptr<typename T::Request>& request,
                                     std::shared_ptr<typename T::Response>& response,
-                                    std::shared_ptr<bool>& callback_executed)
+                                    std::shared_ptr<bool>& callback_executed,
+                                    ServiceOperationContext operation_context)
 {
-    if (!service_request_sent_)
+    // Get operation-specific state variables
+    bool& op_service_request_sent = (operation_context == CHARGE_OPERATION) ? 
+                                    charge_service_request_sent_ : uncharge_service_request_sent_;
+    int64_t& op_current_request_id = (operation_context == CHARGE_OPERATION) ? 
+                                     charge_current_request_id_ : uncharge_current_request_id_;
+
+    if (!op_service_request_sent)
     {
         const char* service_name = client->get_service_name();
         if (!client->wait_for_service(std::chrono::seconds(1)))
@@ -56,13 +63,13 @@ void RobotnikCharge::service_call(std::shared_ptr<rclcpp::Client<T>>& client,
             }
         });
 
-        current_request_id_ = future.request_id;
-        service_request_sent_ = true;
+        op_current_request_id = future.request_id;
+        op_service_request_sent = true;
     }
 
     if (callback_executed) // callback_executed != nullptr; Callback executed
     {
-        service_request_sent_ = false; // Reset the request sent flag after callback has been executed
+        op_service_request_sent = false; // Reset the request sent flag after callback has been executed
     }
 }
 

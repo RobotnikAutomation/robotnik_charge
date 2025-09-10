@@ -118,8 +118,11 @@ RobotnikCharge::RobotnikCharge()
   time_in_step_ = 0;
   dock_finished_ = false;
   move_finished_ = false;
-  service_callback_executed_ = nullptr;
   service_request_sent_ = false;
+  charge_service_request_sent_ = false;
+  charge_current_request_id_ = -1;
+  uncharge_service_request_sent_ = false;
+  uncharge_current_request_id_ = -1;
   current_request_id_ = -1;
   docking_operation_mode_ = "";
   RCLCPP_INFO(get_logger(), "Robotnik Charge started");
