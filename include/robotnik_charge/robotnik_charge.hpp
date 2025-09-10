@@ -51,6 +51,12 @@ enum RobotnikChargeState
   Rotating,
   Finished
 };
+
+enum ServiceOperationContext
+{
+  CHARGE_OPERATION,
+  UNCHARGE_OPERATION
+};
 class RobotnikCharge : public rclcpp::Node
 {
 public:
@@ -115,7 +121,8 @@ private:
   void service_call(std::shared_ptr<rclcpp::Client<T>>& client,
                     std::shared_ptr<typename T::Request>& request,
                     std::shared_ptr<typename T::Response>& response,
-                    std::shared_ptr<bool>& callback_executed);
+                    std::shared_ptr<bool>& callback_executed,
+                    ServiceOperationContext operation_context);
 
   template <typename T>
   bool service_call_callback(const typename rclcpp::Client<T>::SharedFuture& future,
@@ -193,9 +200,14 @@ private:
   bool dock_finished_;
   bool move_finished_;
 
-  std::shared_ptr<bool> service_callback_executed_;
   bool service_request_sent_;
   int64_t current_request_id_;
+
+  // Operation-specific service state tracking to avoid race conditions
+  bool charge_service_request_sent_;
+  int64_t charge_current_request_id_;
+  bool uncharge_service_request_sent_;
+  int64_t uncharge_current_request_id_;
 };
 
 }
