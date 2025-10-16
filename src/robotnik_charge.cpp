@@ -267,6 +267,9 @@ void RobotnikCharge::execute_charge(const std::shared_ptr<GoalHandleCharge> goal
   current_charge_handle_ = goal_handle;
   current_goal_ = *goal_handle->get_goal();
   try_number_ = 0;
+  // Reset service call flags to ensure clean state for new operation
+  service_callback_executed_ = nullptr;
+  service_request_sent_ = false;
   switch_to_state(RobotnikChargeState::DeactivatingLasers);
   auto step_timer = std::make_shared<Timer>(params_.step_timeout);
 
@@ -535,6 +538,9 @@ void RobotnikCharge::execute_uncharge(const std::shared_ptr<GoalHandleUncharge> 
 
   current_uncharge_handle_ = goal_handle;
 
+  // Reset service call flags to ensure clean state for new operation
+  service_callback_executed_ = nullptr;
+  service_request_sent_ = false;
   switch_to_state(RobotnikChargeState::DeactivateRelay);
   auto step_timer = std::make_shared<Timer>(params_.step_timeout);
 
