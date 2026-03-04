@@ -43,7 +43,8 @@ bool RobotnikCharge::set_dock_laser_mode(bool activate)
 
 bool RobotnikCharge::set_charge_relay(bool activate)
 {
-  if (docking_operation_mode_ != DockingStatus::_status_type::MODE_MANUAL_SW)
+  if (docking_operation_mode_ != DockingStatus::_status_type::MODE_MANUAL_SW
+      && docking_operation_mode_ != DockingStatus::_status_type::MODE_OPTA)
   {
     RCLCPP_WARN(this->get_logger(), "Docking mode is %s, skipping set charge relay step", docking_operation_mode_.c_str());
     return true;
