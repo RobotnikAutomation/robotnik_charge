@@ -41,10 +41,10 @@ bool RobotnikCharge::set_dock_laser_mode(bool activate)
   return success;
 }
 
-bool RobotnikCharge::set_charge_relay(bool activate)
+bool RobotnikCharge::activate_charge(bool activate)
 {
   if (docking_operation_mode_ != DockingStatus::_status_type::MODE_MANUAL_SW
-      && docking_operation_mode_ != DockingStatus::_status_type::MODE_OPTA)
+      && docking_operation_mode_ != DockingStatus::_status_type::MODE_AUTO_HW)
   {
     RCLCPP_WARN(this->get_logger(), "Docking mode is %s, skipping set charge relay step", docking_operation_mode_.c_str());
     return true;
@@ -52,8 +52,17 @@ bool RobotnikCharge::set_charge_relay(bool activate)
 
   auto request = std::make_shared<SetBool::Request>();
   static auto response = std::make_shared<SetBool::Response>();
-  request->data = activate;
-  service_call(set_charger_relay_, request, response, service_callback_executed_);
+
+  if (docking_operation_mode_ == DockingStatus::_status_type::MODE_MANUAL_SW)
+  {
+    request->data = activate;
+    service_call(set_charger_relay_, request, response, service_callback_executed_);
+  }
+  else
+  {
+    request->data = activate;
+    service_call(set_charger_enable_, request, response, service_callback_executed_);
+  }
 
   if (!service_callback_executed_) // Callback not executed yet
   {

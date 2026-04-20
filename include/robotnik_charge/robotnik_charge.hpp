@@ -135,7 +135,7 @@ private:
   void send_move_backwards();
   void send_rotation();
   void send_move(Pose pose);
-  bool set_charge_relay(bool activate);
+  bool activate_charge(bool activate);
   bool set_dock_laser_mode(bool activate);
   void retry();
   void charge_abort();
@@ -158,6 +158,7 @@ private:
   rclcpp::Subscription<DockingStatus>::SharedPtr docking_status_subscription_;
 
   rclcpp::Client<SetBool>::SharedPtr set_charger_relay_;
+  rclcpp::Client<SetBool>::SharedPtr set_charger_enable_;
   rclcpp::Client<SetString>::SharedPtr set_laser_mode_;
 
   rclcpp_action::Client<Dock>::SharedPtr dock_action_client_;
