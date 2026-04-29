@@ -47,6 +47,18 @@ RobotnikCharge::RobotnikCharge()
     RCLCPP_INFO(this->get_logger(), "Service \"%s\" not available, waiting again...", set_charger_relay_->get_service_name());
   }
 
+  set_charger_enable_ = create_client<SetBool>("~/set_charger_enable");
+  while (!set_charger_enable_->wait_for_service(1s))
+  {
+    if (!rclcpp::ok())
+    {
+      RCLCPP_ERROR(this->get_logger(), "Interrupted while waiting for the service \"%s\". Exiting.",
+                   set_charger_enable_->get_service_name());
+      return;
+    }
+    RCLCPP_INFO(this->get_logger(), "Service \"%s\" not available, waiting again...", set_charger_enable_->get_service_name());
+  }
+
   // Service client to set laser mode
   if (params_.has_safety_lasers)
   {
@@ -347,7 +359,7 @@ void RobotnikCharge::handle_charge_steps(std::shared_ptr<Timer>& timer)
       break;
 
     case RobotnikChargeState::ActivateRelay:
-      if (set_charge_relay(true))
+      if (activate_charge(true))
       {
         switch_to_state(RobotnikChargeState::WaitCharging, timer);
         timer->change_duration(params_.timeout_charging_detection);
@@ -374,7 +386,7 @@ void RobotnikCharge::handle_charge_steps(std::shared_ptr<Timer>& timer)
       break;
 
     case RobotnikChargeState::DeactivateRelay:
-      if (set_charge_relay(false))
+      if (activate_charge(false))
       {
         switch_to_state(RobotnikChargeState::MovingBackwards, timer);
       }
@@ -569,7 +581,7 @@ void RobotnikCharge::handle_uncharge_steps(std::shared_ptr<Timer>& timer)
   switch (charge_manager_state_)
   {
     case RobotnikChargeState::DeactivateRelay:
-      if (set_charge_relay(false))
+      if (activate_charge(false))
       {
         switch_to_state(RobotnikChargeState::DeactivatingLasers, timer);
       }
@@ -649,6 +661,7 @@ void RobotnikCharge::handle_timeout_for_steps(std::shared_ptr<Timer>& timer)
   {
     case RobotnikChargeState::DeactivateRelay:
       remove_pending_requests(set_charger_relay_);
+      remove_pending_requests(set_charger_enable_);
       switch_to_state(RobotnikChargeState::Aborted, timer);
       break;
 
@@ -668,6 +681,7 @@ void RobotnikCharge::handle_timeout_for_steps(std::shared_ptr<Timer>& timer)
 
     case RobotnikChargeState::ActivateRelay:
       remove_pending_requests(set_charger_relay_);
+      remove_pending_requests(set_charger_enable_);
       switch_to_state(RobotnikChargeState::Retry, timer);
       break;
 
