@@ -44,9 +44,23 @@ void RobotnikCharge::action_result_callback(const typename rclcpp_action::Client
       RCLCPP_INFO(this->get_logger(), "Action %s succeeded. Proceeding to next step.", action_name);
       break;
     case rclcpp_action::ResultCode::ABORTED:
-    case rclcpp_action::ResultCode::CANCELED:
-    default:
       RCLCPP_ERROR(this->get_logger(), "Action %s failed.", action_name);
+      switch_to_state(RobotnikChargeState::Aborted);
+      break;
+    case rclcpp_action::ResultCode::CANCELED:
+      if (charge_manager_state_ == RobotnikChargeState::Finished)
+      {
+        RCLCPP_INFO(
+          this->get_logger(), "Action %s canceled after charge procedure finished.", action_name);
+      }
+      else
+      {
+        RCLCPP_ERROR(this->get_logger(), "Action %s was canceled unexpectedly.", action_name);
+        switch_to_state(RobotnikChargeState::Aborted);
+      }
+      break;
+    default:
+      RCLCPP_ERROR(this->get_logger(), "Action %s returned an unknown result.", action_name);
       switch_to_state(RobotnikChargeState::Aborted);
       break;
   }
