@@ -377,6 +377,11 @@ void RobotnikCharge::handle_charge_steps(std::shared_ptr<Timer>& timer)
 
     case RobotnikChargeState::Charging:
       switch_to_state(RobotnikChargeState::Finished, timer);
+      // A charging indication can arrive while the final docking or move goal is
+      // still active. Stop those child actions before completing the parent goal
+      // so they cannot time out or move the robot after charging has succeeded.
+      dock_action_client_->async_cancel_all_goals();
+      move_action_client_->async_cancel_all_goals();
       send_charge_result(true);
       break;
 
